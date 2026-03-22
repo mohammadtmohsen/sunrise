@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
-import { View, Text, FlatList, Pressable, RefreshControl } from 'react-native';
+import { View, Text, FlatList, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useLocation } from '../src/hooks/useLocation';
+import { useLocationStore } from '../src/stores/locationStore';
 import { useSunTimes } from '../src/hooks/useSunTimes';
 import { useAlarms } from '../src/hooks/useAlarms';
 import { cancelAlarm } from '../src/services/alarmScheduler';
@@ -15,13 +15,9 @@ import type { Alarm } from '../src/models/types';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { location, isLoading: locationLoading, fetchLocation } = useLocation();
+  const location = useLocationStore((s) => s.location);
   const { todaySunTimes } = useSunTimes(location);
   const { alarms, toggleAlarm } = useAlarms(todaySunTimes);
-
-  const onRefresh = useCallback(() => {
-    fetchLocation();
-  }, [fetchLocation]);
 
   const handleAlarmPress = useCallback(
     (id: string) => {
@@ -128,13 +124,6 @@ export default function HomeScreen() {
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={locationLoading}
-            onRefresh={onRefresh}
-            tintColor={COLORS.primary}
-          />
-        }
       />
 
       {/* FAB */}

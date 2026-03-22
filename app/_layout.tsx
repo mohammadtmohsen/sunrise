@@ -22,7 +22,7 @@ import { COLORS } from '../src/utils/constants';
 
 export default function RootLayout() {
   const router = useRouter();
-  const { location, fetchLocation } = useLocation();
+  const { location, isLoading: locationLoading, fetchLocation } = useLocation();
   const { todaySunTimes, isValid } = useSunTimes(location);
 
   useAppStateRecalculation();
@@ -97,7 +97,7 @@ export default function RootLayout() {
 
       {/* Persistent sun times header */}
       <View style={{ paddingTop: 60, paddingBottom: 12, backgroundColor: COLORS.background }}>
-        <SunTimesDisplay sunTimes={todaySunTimes} isValid={isValid} />
+        <SunTimesDisplay sunTimes={todaySunTimes} isValid={isValid} onRefresh={fetchLocation} isRefreshing={locationLoading} />
       </View>
 
       {/* Page content below */}
