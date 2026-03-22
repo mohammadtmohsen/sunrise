@@ -22,22 +22,22 @@ function NumberStepper({
   max: number;
 }) {
   return (
-    <View style={{ alignItems: 'center' }}>
-      <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 8 }}>
+    <View
+      style={{ alignItems: 'center', flex: 1 }}
+      accessibilityRole="adjustable"
+      accessibilityLabel={`${label}: ${value}`}
+      accessibilityValue={{ min: 0, max, now: value }}
+    >
+      <Text style={{ color: COLORS.textSecondary, fontSize: 12, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
         {label}
       </Text>
-      <View
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
-        accessibilityRole="adjustable"
-        accessibilityLabel={`${label}: ${value}`}
-        accessibilityValue={{ min: 0, max, now: value }}
-      >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
         <Pressable
           onPress={() => { Haptics.selectionAsync(); onChange(Math.max(0, value - 1)); }}
           style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
+            width: 36,
+            height: 36,
+            borderRadius: 18,
             backgroundColor: COLORS.surfaceLight,
             alignItems: 'center',
             justifyContent: 'center',
@@ -45,17 +45,17 @@ function NumberStepper({
           accessibilityLabel={`Decrease ${label.toLowerCase()}`}
           accessibilityRole="button"
         >
-          <Text style={{ color: COLORS.textPrimary, fontSize: 20, fontWeight: '700' }}>-</Text>
+          <Text style={{ color: COLORS.textPrimary, fontSize: 18, fontWeight: '700' }}>-</Text>
         </Pressable>
-        <Text style={{ color: COLORS.textPrimary, fontSize: 36, fontWeight: '700', minWidth: 60, textAlign: 'center' }}>
+        <Text style={{ color: COLORS.textPrimary, fontSize: 32, fontWeight: '700', width: 50, textAlign: 'center' }}>
           {String(value).padStart(2, '0')}
         </Text>
         <Pressable
           onPress={() => { Haptics.selectionAsync(); onChange(Math.min(max, value + 1)); }}
           style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
+            width: 36,
+            height: 36,
+            borderRadius: 18,
             backgroundColor: COLORS.surfaceLight,
             alignItems: 'center',
             justifyContent: 'center',
@@ -63,7 +63,7 @@ function NumberStepper({
           accessibilityLabel={`Increase ${label.toLowerCase()}`}
           accessibilityRole="button"
         >
-          <Text style={{ color: COLORS.textPrimary, fontSize: 20, fontWeight: '700' }}>+</Text>
+          <Text style={{ color: COLORS.textPrimary, fontSize: 18, fontWeight: '700' }}>+</Text>
         </Pressable>
       </View>
     </View>
@@ -72,9 +72,9 @@ function NumberStepper({
 
 export function TimeOffsetPicker({ hours, minutes, onHoursChange, onMinutesChange }: Props) {
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 32, paddingVertical: 16 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
       <NumberStepper label="Hours" value={hours} onChange={onHoursChange} max={23} />
-      <Text style={{ color: COLORS.textMuted, fontSize: 36, fontWeight: '700', alignSelf: 'flex-end', marginBottom: 0 }}>
+      <Text style={{ color: COLORS.textMuted, fontSize: 32, fontWeight: '700', marginTop: 16 }}>
         :
       </Text>
       <NumberStepper label="Minutes" value={minutes} onChange={onMinutesChange} max={59} />
