@@ -89,47 +89,58 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
               alignItems: 'center',
             })}
             accessibilityRole="button"
-            accessibilityLabel={`${alarm.name}, ${isAbsolute ? formatTime24(alarm.absoluteHour, alarm.absoluteMinute) : `${formatOffset(alarm.offsetMinutes)} ${eventLabel}`}, ${alarm.isEnabled ? 'enabled' : 'disabled'}${alarm.nextTriggerAt && alarm.isEnabled ? `, next at ${formatTime(new Date(alarm.nextTriggerAt))}` : ''}`}
+            accessibilityLabel={`${alarm.name}, ${isAbsolute ? formatTime24(alarm.absoluteHour, alarm.absoluteMinute) : `${formatOffset(alarm.offsetMinutes)} ${eventLabel}`}, ${alarm.isEnabled ? 'enabled' : 'disabled'}${alarm.nextTriggerAt ? `, next at ${formatTime(new Date(alarm.nextTriggerAt))}` : ''}`}
             accessibilityHint="Double tap to edit"
           >
-            {/* Event icon */}
-            <View style={{ marginRight: 14 }} accessibilityElementsHidden>
-              <EventIconComponent size={28} />
-            </View>
-
-            {/* Info */}
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 }}>
+            {/* Column 1: Time + Icon */}
+            <View style={{ alignItems: 'center', marginRight: 14, minWidth: 56 }}>
+              {alarm.nextTriggerAt ? (
                 <Text
                   style={{
-                    color: COLORS.textPrimary,
-                    fontSize: 17,
-                    fontWeight: '600',
-                    flex: 1,
+                    color: alarm.isEnabled ? COLORS.textPrimary : COLORS.textMuted,
+                    fontSize: 18,
+                    fontWeight: '700',
+                    marginBottom: 6,
                   }}
-                  numberOfLines={1}
                 >
-                  {alarm.name}
+                  {formatTime(new Date(alarm.nextTriggerAt))}
                 </Text>
-                {alarm.nextTriggerAt && (
-                  <Text style={{ color: alarm.isEnabled ? COLORS.textPrimary : COLORS.textMuted, fontSize: 17, fontWeight: '700', paddingLeft: 8 }}>
-                    {formatTime(new Date(alarm.nextTriggerAt))}
-                  </Text>
-                )}
+              ) : (
+                <Text style={{ color: COLORS.textMuted, fontSize: 14, marginBottom: 6 }}>--:--</Text>
+              )}
+              <View accessibilityElementsHidden>
+                <EventIconComponent size={22} />
               </View>
-              <Text style={{ color: alarm.isEnabled ? eventColor : COLORS.textMuted, fontSize: 13, marginBottom: 2 }}>
+            </View>
+
+            {/* Column 2: Details */}
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: alarm.isEnabled ? COLORS.textPrimary : COLORS.textMuted,
+                  fontSize: 17,
+                  fontWeight: '600',
+                  marginBottom: 3,
+                }}
+                numberOfLines={1}
+              >
+                {alarm.name}
+              </Text>
+              <Text style={{ color: alarm.isEnabled ? eventColor : COLORS.textMuted, fontSize: 13, marginBottom: 3 }}>
                 {isAbsolute
                   ? `Daily at ${formatTime24(alarm.absoluteHour, alarm.absoluteMinute)}`
                   : `${formatOffset(alarm.offsetMinutes)} ${eventLabel.toLowerCase()}`}
               </Text>
-              {alarm.nextTriggerAt && (
-                <Text style={{ color: alarm.isEnabled ? COLORS.accent : COLORS.textMuted, fontSize: 12 }}>
-                  {alarm.isEnabled ? formatTimeUntil(new Date(alarm.nextTriggerAt)) : 'Disabled'}
-                </Text>
-              )}
+              <Text style={{ color: alarm.isEnabled ? COLORS.accent : COLORS.textMuted, fontSize: 12 }}>
+                {alarm.isEnabled
+                  ? alarm.nextTriggerAt
+                    ? formatTimeUntil(new Date(alarm.nextTriggerAt))
+                    : ''
+                  : 'Disabled'}
+              </Text>
             </View>
 
-            {/* Toggle */}
+            {/* Column 3: Toggle */}
             <Switch
               style={{ marginLeft: 12 }}
               value={alarm.isEnabled}
