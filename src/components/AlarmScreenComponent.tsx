@@ -133,7 +133,7 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
           ]}
         >
           <Animated.Text style={[{ fontSize: 80, marginBottom: 32 }, pulseStyle]}>
-            {'\u2600\uFE0F'}
+            ☀️
           </Animated.Text>
 
           <Text
@@ -161,7 +161,7 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
 
           <View style={{ marginTop: 4, marginBottom: 80, alignItems: 'center' }}>
             <Text style={{ color: COLORS.textMuted, fontSize: 28, marginBottom: 4 }}>
-              {'\u2303'}
+              ▲
             </Text>
             <Text style={{ color: COLORS.textMuted, fontSize: 15 }}>
               Swipe up to dismiss

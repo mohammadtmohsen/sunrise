@@ -144,7 +144,7 @@ export default function EditAlarmScreen() {
           }}
         >
           <Text style={{ color: COLORS.textPrimary, fontSize: 15, fontWeight: alarmType === 'relative' ? '700' : '400' }}>
-            {'\u2600\uFE0F'} Sun-relative
+            ☀️ Sun-relative
           </Text>
         </Pressable>
         <Pressable
@@ -158,7 +158,7 @@ export default function EditAlarmScreen() {
           }}
         >
           <Text style={{ color: COLORS.textPrimary, fontSize: 15, fontWeight: alarmType === 'absolute' ? '700' : '400' }}>
-            {'\u23F0'} Fixed time
+            ⏰ Fixed time
           </Text>
         </Pressable>
       </View>
@@ -183,7 +183,7 @@ export default function EditAlarmScreen() {
                 }}
               >
                 <Text style={{ color: COLORS.textPrimary, fontSize: 16, fontWeight: referenceEvent === event ? '700' : '400' }}>
-                  {event === 'sunrise' ? '\u2600\uFE0F Sunrise' : '\uD83C\uDF05 Sunset'}
+                  {event === 'sunrise' ? '☀️ Sunrise' : '🌅 Sunset'}
                 </Text>
               </Pressable>
             ))}

@@ -84,7 +84,7 @@ export default function HomeScreen() {
             accessibilityRole="button"
           >
             <Text style={{ color: COLORS.textSecondary, fontSize: 22 }}>
-              {'\u2699\uFE0F'}
+              ⚙️
             </Text>
           </Pressable>
         </View>
@@ -103,7 +103,7 @@ export default function HomeScreen() {
           style={{ fontSize: 56, marginBottom: 16 }}
           accessibilityElementsHidden
         >
-          {'\u23F0'}
+          ⏰
         </Text>
         <Text
           style={{

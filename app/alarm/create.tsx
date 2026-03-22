@@ -8,7 +8,7 @@ import { useSunTimes } from '../../src/hooks/useSunTimes';
 import { TimeOffsetPicker } from '../../src/components/TimeOffsetPicker';
 import { AbsoluteTimePicker } from '../../src/components/AbsoluteTimePicker';
 import { scheduleAlarm } from '../../src/services/alarmScheduler';
-import { formatTime, formatTime24, computeTriggerTime, computeAbsoluteTriggerTime } from '../../src/utils/timeUtils';
+import { formatTime, computeTriggerTime, computeAbsoluteTriggerTime } from '../../src/utils/timeUtils';
 import { COLORS } from '../../src/utils/constants';
 import type { AlarmType } from '../../src/models/types';
 
@@ -120,7 +120,7 @@ export default function CreateAlarmScreen() {
           }}
         >
           <Text style={{ color: COLORS.textPrimary, fontSize: 15, fontWeight: alarmType === 'relative' ? '700' : '400' }}>
-            {'\u2600\uFE0F'} Sun-relative
+            ☀️ Sun-relative
           </Text>
         </Pressable>
         <Pressable
@@ -134,7 +134,7 @@ export default function CreateAlarmScreen() {
           }}
         >
           <Text style={{ color: COLORS.textPrimary, fontSize: 15, fontWeight: alarmType === 'absolute' ? '700' : '400' }}>
-            {'\u23F0'} Fixed time
+            ⏰ Fixed time
           </Text>
         </Pressable>
       </View>
@@ -160,7 +160,7 @@ export default function CreateAlarmScreen() {
                 }}
               >
                 <Text style={{ color: COLORS.textPrimary, fontSize: 16, fontWeight: referenceEvent === event ? '700' : '400' }}>
-                  {event === 'sunrise' ? '\u2600\uFE0F Sunrise' : '\uD83C\uDF05 Sunset'}
+                  {event === 'sunrise' ? '☀️ Sunrise' : '🌅 Sunset'}
                 </Text>
               </Pressable>
             ))}

@@ -189,7 +189,7 @@ export default function AlarmTriggerScreen() {
 
         {/* Icon */}
         <Animated.Text style={[{ fontSize: 80, marginBottom: 24 }, pulseStyle]}>
-          {isSunrise ? '\u2600\uFE0F' : '\uD83C\uDF05'}
+          {isSunrise ? '☀️' : '🌅'}
         </Animated.Text>
 
         {/* Time */}
@@ -205,7 +205,7 @@ export default function AlarmTriggerScreen() {
         {/* Swipe hint */}
         <View style={styles.hintContainer}>
           <Animated.Text style={[styles.chevron, { color: COLORS.textMuted }, chevronStyle]}>
-            {'\u2303'}
+            ▲
           </Animated.Text>
           <Text style={[styles.hintText, { color: COLORS.textMuted }]}>
             Swipe up to dismiss

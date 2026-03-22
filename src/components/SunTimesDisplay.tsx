@@ -111,7 +111,7 @@ export function SunTimesDisplay({ sunTimes, isValid }: Props) {
         accessibilityLabel="Location required to show sunrise and sunset times"
       >
         <Text style={{ color: COLORS.textMuted, fontSize: 40, textAlign: 'center', marginBottom: 12 }}>
-          {'\uD83D\uDCCD'}
+          📍
         </Text>
         <Text style={{ color: COLORS.textSecondary, fontSize: 16, textAlign: 'center', lineHeight: 22 }}>
           Enable location to see{'\n'}sunrise & sunset times
@@ -161,7 +161,7 @@ export function SunTimesDisplay({ sunTimes, isValid }: Props) {
             style={{ fontSize: 28, marginBottom: 2 }}
             accessibilityElementsHidden
           >
-            {'\u2600\uFE0F'}
+            ☀️
           </Text>
           <Text style={{ color: COLORS.textMuted, fontSize: 12, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
             Sunrise
@@ -190,7 +190,7 @@ export function SunTimesDisplay({ sunTimes, isValid }: Props) {
             style={{ fontSize: 28, marginBottom: 2 }}
             accessibilityElementsHidden
           >
-            {'\uD83C\uDF05'}
+            🌅
           </Text>
           <Text style={{ color: COLORS.textMuted, fontSize: 12, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
             Sunset

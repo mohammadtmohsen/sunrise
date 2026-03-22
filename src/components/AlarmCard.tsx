@@ -24,7 +24,7 @@ const DELETE_THRESHOLD = -80;
 export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
   const isAbsolute = alarm.type === 'absolute';
   const eventLabel = isAbsolute ? 'Fixed time' : alarm.referenceEvent === 'sunrise' ? 'Sunrise' : 'Sunset';
-  const eventIcon = isAbsolute ? '\u23F0' : alarm.referenceEvent === 'sunrise' ? '\u2600\uFE0F' : '\uD83C\uDF05';
+  const eventIcon = isAbsolute ? '⏰' : alarm.referenceEvent === 'sunrise' ? '☀️' : '🌅';
   const eventColor = isAbsolute ? COLORS.accent : alarm.referenceEvent === 'sunrise' ? COLORS.sunrise : COLORS.sunset;
 
   const translateX = useSharedValue(0);
