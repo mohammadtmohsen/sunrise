@@ -106,25 +106,26 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
                     color: COLORS.textPrimary,
                     fontSize: 17,
                     fontWeight: '600',
+                    flex: 1,
                   }}
                   numberOfLines={1}
                 >
                   {alarm.name}
                 </Text>
-                {alarm.nextTriggerAt && alarm.isEnabled && (
-                  <Text style={{ color: COLORS.textPrimary, fontSize: 17, fontWeight: '700', marginLeft: 'auto', paddingLeft: 8 }}>
+                {alarm.nextTriggerAt && (
+                  <Text style={{ color: alarm.isEnabled ? COLORS.textPrimary : COLORS.textMuted, fontSize: 17, fontWeight: '700', paddingLeft: 8 }}>
                     {formatTime(new Date(alarm.nextTriggerAt))}
                   </Text>
                 )}
               </View>
-              <Text style={{ color: eventColor, fontSize: 13, marginBottom: 2 }}>
+              <Text style={{ color: alarm.isEnabled ? eventColor : COLORS.textMuted, fontSize: 13, marginBottom: 2 }}>
                 {isAbsolute
                   ? `Daily at ${formatTime24(alarm.absoluteHour, alarm.absoluteMinute)}`
                   : `${formatOffset(alarm.offsetMinutes)} ${eventLabel.toLowerCase()}`}
               </Text>
-              {alarm.nextTriggerAt && alarm.isEnabled && (
-                <Text style={{ color: COLORS.accent, fontSize: 12 }}>
-                  {formatTimeUntil(new Date(alarm.nextTriggerAt))}
+              {alarm.nextTriggerAt && (
+                <Text style={{ color: alarm.isEnabled ? COLORS.accent : COLORS.textMuted, fontSize: 12 }}>
+                  {alarm.isEnabled ? formatTimeUntil(new Date(alarm.nextTriggerAt)) : 'Disabled'}
                 </Text>
               )}
             </View>
