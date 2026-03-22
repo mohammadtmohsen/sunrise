@@ -23,6 +23,7 @@ function withAlarmPermissions(config) {
       'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
       'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
       'android.permission.RECEIVE_BOOT_COMPLETED',
+      'android.permission.SCHEDULE_EXACT_ALARM',
     ];
 
     for (const perm of permissionsToAdd) {

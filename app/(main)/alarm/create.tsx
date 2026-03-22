@@ -65,12 +65,16 @@ export default function CreateAlarmScreen() {
     });
 
     // Schedule the alarm notification (trigger time is recalculated on home screen load)
-    const alarm = useAlarmStore.getState().alarms[alarmId];
-    if (alarm) {
-      const notificationId = await scheduleAlarm(alarm, todaySunTimes);
-      if (notificationId) {
-        useAlarmStore.getState().updateAlarm(alarmId, { notificationId });
+    try {
+      const alarm = useAlarmStore.getState().alarms[alarmId];
+      if (alarm) {
+        const notificationId = await scheduleAlarm(alarm, todaySunTimes);
+        if (notificationId) {
+          useAlarmStore.getState().updateAlarm(alarmId, { notificationId });
+        }
       }
+    } catch (e) {
+      console.warn('Failed to schedule alarm:', e);
     }
 
     router.back();

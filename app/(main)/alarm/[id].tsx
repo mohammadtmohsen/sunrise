@@ -77,12 +77,16 @@ export default function EditAlarmScreen() {
     });
 
     // Reschedule (trigger time is recalculated on home screen load)
-    const updated = useAlarmStore.getState().alarms[id!];
-    if (updated && updated.isEnabled) {
-      const notificationId = await scheduleAlarm(updated, todaySunTimes);
-      if (notificationId) {
-        updateAlarm(id!, { notificationId });
+    try {
+      const updated = useAlarmStore.getState().alarms[id!];
+      if (updated && updated.isEnabled) {
+        const notificationId = await scheduleAlarm(updated, todaySunTimes);
+        if (notificationId) {
+          updateAlarm(id!, { notificationId });
+        }
       }
+    } catch (e) {
+      console.warn('Failed to schedule alarm:', e);
     }
 
     router.back();
