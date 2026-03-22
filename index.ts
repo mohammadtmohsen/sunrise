@@ -1,6 +1,7 @@
 import notifee, { EventType } from '@notifee/react-native';
 import { dismissAlarm, scheduleSnooze } from './src/services/alarmScheduler';
 import { scheduleNextDayAlarm } from './src/services/nextDayScheduler';
+import { updatePersistentNotification } from './src/services/persistentNotificationService';
 import { useAlarmStore } from './src/stores/alarmStore';
 
 // Register the standalone alarm screen component for Android full-screen intent.
@@ -25,17 +26,20 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
         await dismissAlarm(alarmId);
         // Schedule next day's occurrence (third leg of triple-redundancy)
         await scheduleNextDayAlarm(alarmId);
+        await updatePersistentNotification();
       } else if (detail.pressAction?.id === 'snooze') {
         const alarm = useAlarmStore.getState().alarms[alarmId];
         if (alarm) {
           await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
           await dismissAlarm(alarmId);
         }
+        await updatePersistentNotification();
       }
       break;
     case EventType.DISMISSED:
       await dismissAlarm(alarmId);
       await scheduleNextDayAlarm(alarmId);
+      await updatePersistentNotification();
       break;
   }
 });

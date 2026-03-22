@@ -7,9 +7,11 @@ import { useLocation } from '../src/hooks/useLocation';
 import { useAlarmStore } from '../src/stores/alarmStore';
 import {
   setupNotificationChannel,
+  setupStatusNotificationChannel,
   requestNotificationPermission,
   setupIOSCategories,
 } from '../src/services/notificationService';
+import { updatePersistentNotification } from '../src/services/persistentNotificationService';
 import { dismissAlarm, scheduleSnooze } from '../src/services/alarmScheduler';
 import { scheduleNextDayAlarm } from '../src/services/nextDayScheduler';
 import { useAppStateRecalculation } from '../src/hooks/useAppStateRecalculation';
@@ -34,9 +36,11 @@ export default function RootLayout() {
     async function init() {
       await requestNotificationPermission();
       await setupNotificationChannel();
+      await setupStatusNotificationChannel();
       await setupIOSCategories();
       await registerBackgroundRecalculation();
       useSettingsStore.getState().setOnboardingComplete();
+      await updatePersistentNotification();
     }
     init();
   }, []);
@@ -64,9 +68,11 @@ export default function RootLayout() {
               scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
             }
             dismissAlarm(alarmId);
+            updatePersistentNotification();
           } else if (detail.pressAction?.id === 'dismiss' && alarmId) {
             dismissAlarm(alarmId);
             scheduleNextDayAlarm(alarmId);
+            updatePersistentNotification();
           }
           break;
       }

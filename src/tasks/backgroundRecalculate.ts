@@ -4,6 +4,7 @@ import { useAlarmStore } from '../stores/alarmStore';
 import { useLocationStore } from '../stores/locationStore';
 import { getSunTimes } from '../services/sunCalcService';
 import { scheduleAllAlarms } from '../services/alarmScheduler';
+import { updatePersistentNotification } from '../services/persistentNotificationService';
 
 export const RECALCULATE_TASK = 'RECALCULATE_SUNRISE_ALARMS';
 
@@ -37,6 +38,8 @@ TaskManager.defineTask(RECALCULATE_TASK, async () => {
     if (enabledAlarms.length > 0) {
       await scheduleAllAlarms(enabledAlarms, sunTimes);
     }
+
+    await updatePersistentNotification();
 
     return BackgroundFetch.BackgroundFetchResult.NewData;
   } catch (error) {

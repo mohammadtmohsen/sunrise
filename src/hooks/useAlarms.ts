@@ -5,6 +5,7 @@ import {
   cancelAlarm,
   scheduleAllAlarms,
 } from '../services/alarmScheduler';
+import { updatePersistentNotification } from '../services/persistentNotificationService';
 import type { SunTimes } from '../models/types';
 
 export function useAlarms(sunTimes: SunTimes | null) {
@@ -36,7 +37,9 @@ export function useAlarms(sunTimes: SunTimes | null) {
       (a) => a.isEnabled,
     );
     if (enabled.length > 0) {
-      scheduleAllAlarms(enabled, sunTimes);
+      scheduleAllAlarms(enabled, sunTimes).then(() => updatePersistentNotification());
+    } else {
+      updatePersistentNotification();
     }
   }, [alarmFingerprint, sunTimes?.date, sunTimes?.sunrise?.getTime(), sunTimes?.sunset?.getTime()]);
 
@@ -58,6 +61,7 @@ export function useAlarms(sunTimes: SunTimes | null) {
         await cancelAlarm(alarm);
         updateAlarm(id, { notificationId: null });
       }
+      updatePersistentNotification();
     },
     [sunTimes, toggleAlarm, updateAlarm],
   );

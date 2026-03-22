@@ -11,6 +11,10 @@ import {
   openPowerManagerSettings,
   openAlarmPermissionSettings,
 } from '../src/services/notificationService';
+import {
+  updatePersistentNotification,
+  cancelPersistentNotification,
+} from '../src/services/persistentNotificationService';
 import { COLORS } from '../src/utils/constants';
 
 function SettingsRow({
@@ -48,8 +52,14 @@ function SettingsRow({
 
 export default function SettingsScreen() {
   const { location, isLoading, fetchLocation } = useLocation();
-  const { defaultVibrate, setDefaultVibrate, defaultSnoozeDuration, setDefaultSnoozeDuration } =
-    useSettingsStore();
+  const {
+    defaultVibrate,
+    setDefaultVibrate,
+    defaultSnoozeDuration,
+    setDefaultSnoozeDuration,
+    showPersistentNotification,
+    setShowPersistentNotification,
+  } = useSettingsStore();
 
   const [notifPermission, setNotifPermission] = useState<boolean | null>(null);
   const [criticalAlerts, setCriticalAlerts] = useState<boolean | null>(null);
@@ -212,6 +222,46 @@ export default function SettingsScreen() {
           />
         </View>
       </View>
+
+      {/* Status Notification (Android only) */}
+      {Platform.OS === 'android' && (
+        <>
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginLeft: 20, marginTop: 24, marginBottom: 8 }}>
+            STATUS NOTIFICATION
+          </Text>
+          <View style={{ borderRadius: 12, overflow: 'hidden', marginHorizontal: 16 }}>
+            <View
+              style={{
+                backgroundColor: COLORS.surface,
+                padding: 16,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={{ color: COLORS.textPrimary, fontSize: 16 }}>Always-on notification</Text>
+                <Text style={{ color: COLORS.textMuted, fontSize: 12, marginTop: 4 }}>
+                  Shows sunrise time, next alarm, and countdown in your notification shade
+                </Text>
+              </View>
+              <Switch
+                value={showPersistentNotification}
+                onValueChange={(value) => {
+                  setShowPersistentNotification(value);
+                  if (value) {
+                    updatePersistentNotification();
+                  } else {
+                    cancelPersistentNotification();
+                  }
+                }}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor="#ffffff"
+              />
+            </View>
+          </View>
+        </>
+      )}
 
       {/* About */}
       <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginLeft: 20, marginTop: 24, marginBottom: 8 }}>

@@ -5,7 +5,7 @@ import notifee, {
   IOSNotificationSetting,
 } from '@notifee/react-native';
 import { Platform } from 'react-native';
-import { ALARM_CHANNEL_ID } from '../utils/constants';
+import { ALARM_CHANNEL_ID, STATUS_CHANNEL_ID } from '../utils/constants';
 
 /**
  * Set up the Android notification channel for alarms.
@@ -23,6 +23,24 @@ export async function setupNotificationChannel(): Promise<void> {
     sound: 'default',
     vibration: true,
     bypassDnd: true,
+  });
+}
+
+/**
+ * Set up the Android notification channel for the persistent status notification.
+ * Uses LOW importance so it appears silently in the shade without sound/vibration.
+ */
+export async function setupStatusNotificationChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  await notifee.createChannel({
+    id: STATUS_CHANNEL_ID,
+    name: 'Alarm Status',
+    description: 'Always-visible notification showing sunrise time and next alarm',
+    importance: AndroidImportance.LOW,
+    visibility: AndroidVisibility.PUBLIC,
+    sound: undefined,
+    vibration: false,
   });
 }
 

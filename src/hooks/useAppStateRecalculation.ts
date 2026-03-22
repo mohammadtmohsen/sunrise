@@ -4,6 +4,7 @@ import { useAlarmStore } from '../stores/alarmStore';
 import { useLocationStore } from '../stores/locationStore';
 import { getSunTimes, isSunTimesValid } from '../services/sunCalcService';
 import { scheduleAllAlarms } from '../services/alarmScheduler';
+import { updatePersistentNotification } from '../services/persistentNotificationService';
 import { getTodayDateString } from '../utils/timeUtils';
 
 /**
@@ -41,6 +42,8 @@ export function useAppStateRecalculation() {
       if (enabledAlarms.length > 0) {
         await scheduleAllAlarms(enabledAlarms, sunTimes);
       }
+
+      await updatePersistentNotification();
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
