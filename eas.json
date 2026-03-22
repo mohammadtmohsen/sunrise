@@ -26,6 +26,10 @@
     },
     "preview": {
       "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "image": "latest"
+      },
       "ios": {
         "simulator": false
       },
@@ -41,15 +45,6 @@
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "appleId": "",
-        "ascAppId": "",
-        "appleTeamId": ""
-      },
-      "android": {
-        "serviceAccountKeyPath": ""
-      }
-    }
+    "production": {}
   }
 }
