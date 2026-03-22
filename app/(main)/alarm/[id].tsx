@@ -8,6 +8,7 @@ import { useSunTimes } from '../../../src/hooks/useSunTimes';
 import { TimeOffsetPicker } from '../../../src/components/TimeOffsetPicker';
 import { AbsoluteTimePicker } from '../../../src/components/AbsoluteTimePicker';
 import { scheduleAlarm, cancelAlarm } from '../../../src/services/alarmScheduler';
+import { updatePersistentNotification } from '../../../src/services/persistentNotificationService';
 import { formatTime, computeTriggerTime, computeAbsoluteTriggerTime } from '../../../src/utils/timeUtils';
 import { SunriseIcon } from '../../../src/components/Icons';
 import { COLORS } from '../../../src/utils/constants';
@@ -67,6 +68,14 @@ export default function EditAlarmScreen() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Compute nextTriggerAt immediately so persistent notification can show it
+    const triggerTime = alarmType === 'absolute'
+      ? computeAbsoluteTriggerTime(absoluteHour, absoluteMinute)
+      : todaySunTimes
+        ? computeTriggerTime(todaySunTimes[referenceEvent], offsetMinutes)
+        : null;
+
     updateAlarm(id!, {
       name: name.trim(),
       type: alarmType,
@@ -74,9 +83,10 @@ export default function EditAlarmScreen() {
       offsetMinutes,
       absoluteHour,
       absoluteMinute,
+      nextTriggerAt: triggerTime?.toISOString() ?? null,
     });
 
-    // Reschedule (trigger time is recalculated on home screen load)
+    // Reschedule
     try {
       const updated = useAlarmStore.getState().alarms[id!];
       if (updated && updated.isEnabled) {
@@ -89,6 +99,7 @@ export default function EditAlarmScreen() {
       console.warn('Failed to schedule alarm:', e);
     }
 
+    updatePersistentNotification();
     router.back();
   };
 

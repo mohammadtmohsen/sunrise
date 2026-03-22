@@ -8,6 +8,7 @@ import { useSunTimes } from '../../../src/hooks/useSunTimes';
 import { TimeOffsetPicker } from '../../../src/components/TimeOffsetPicker';
 import { AbsoluteTimePicker } from '../../../src/components/AbsoluteTimePicker';
 import { scheduleAlarm } from '../../../src/services/alarmScheduler';
+import { updatePersistentNotification } from '../../../src/services/persistentNotificationService';
 import { formatTime, computeTriggerTime, computeAbsoluteTriggerTime } from '../../../src/utils/timeUtils';
 import { SunriseIcon } from '../../../src/components/Icons';
 import { COLORS } from '../../../src/utils/constants';
@@ -64,7 +65,19 @@ export default function CreateAlarmScreen() {
       absoluteMinute,
     });
 
-    // Schedule the alarm notification (trigger time is recalculated on home screen load)
+    // Compute nextTriggerAt immediately so persistent notification can show it
+    const triggerTime = alarmType === 'absolute'
+      ? computeAbsoluteTriggerTime(absoluteHour, absoluteMinute)
+      : todaySunTimes
+        ? computeTriggerTime(todaySunTimes[referenceEvent], offsetMinutes)
+        : null;
+    if (triggerTime) {
+      useAlarmStore.getState().updateAlarm(alarmId, {
+        nextTriggerAt: triggerTime.toISOString(),
+      });
+    }
+
+    // Schedule the alarm notification
     try {
       const alarm = useAlarmStore.getState().alarms[alarmId];
       if (alarm) {
@@ -77,6 +90,7 @@ export default function CreateAlarmScreen() {
       console.warn('Failed to schedule alarm:', e);
     }
 
+    updatePersistentNotification();
     router.back();
   };
 

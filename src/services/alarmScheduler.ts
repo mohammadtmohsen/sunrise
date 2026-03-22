@@ -6,7 +6,7 @@ import notifee, {
   AndroidStyle,
   AlarmType,
 } from '@notifee/react-native';
-import { Platform } from 'react-native';
+import { Platform, Alert, Linking } from 'react-native';
 import type { Alarm, SunTimes } from '../models/types';
 import {
   computeTriggerTime,
@@ -16,6 +16,38 @@ import {
   formatOffset,
 } from '../utils/timeUtils';
 import { ALARM_CHANNEL_ID } from '../utils/constants';
+
+/**
+ * Ensure Android exact alarm permission is granted.
+ * On Android 12+, SCHEDULE_EXACT_ALARM must be explicitly enabled by the user.
+ * Returns true if scheduling can proceed.
+ */
+async function ensureExactAlarmPermission(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+
+  try {
+    const settings = await notifee.getNotificationSettings();
+    // android.alarm is 1 (ENABLED) if exact alarms are allowed
+    if (settings.android?.alarm === 1) return true;
+
+    // Prompt user to enable it
+    Alert.alert(
+      'Exact Alarm Permission Required',
+      'Lumora needs permission to schedule exact alarms. Please enable "Alarms & reminders" for Lumora in the next screen.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Open Settings',
+          onPress: () => notifee.openAlarmPermissionSettings(),
+        },
+      ],
+    );
+    return false;
+  } catch {
+    // If we can't check, try anyway
+    return true;
+  }
+}
 
 /**
  * Compute the trigger time for an alarm based on its type.
@@ -64,6 +96,10 @@ export async function scheduleAlarm(
   if (triggerTime.getTime() <= Date.now()) {
     return null;
   }
+
+  // Ensure exact alarm permission on Android 12+
+  const canSchedule = await ensureExactAlarmPermission();
+  if (!canSchedule) return null;
 
   // Cancel existing notification for this alarm if any
   await cancelAlarm(alarm);
@@ -133,6 +169,7 @@ export async function scheduleAlarm(
       timestamp: triggerTime.getTime(),
       alarmManager: {
         type: AlarmType.SET_ALARM_CLOCK,
+        allowWhileIdle: true,
       },
     },
   );
@@ -255,6 +292,7 @@ export async function scheduleSnooze(
       timestamp: snoozeTime,
       alarmManager: {
         type: AlarmType.SET_ALARM_CLOCK,
+        allowWhileIdle: true,
       },
     },
   );
