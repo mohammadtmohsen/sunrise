@@ -1,0 +1,264 @@
+import React, { useState, useMemo } from 'react';
+import { View, Text, TextInput, Pressable, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import { useAlarmStore } from '../../src/stores/alarmStore';
+import { useLocationStore } from '../../src/stores/locationStore';
+import { useSunTimes } from '../../src/hooks/useSunTimes';
+import { TimeOffsetPicker } from '../../src/components/TimeOffsetPicker';
+import { AbsoluteTimePicker } from '../../src/components/AbsoluteTimePicker';
+import { scheduleAlarm } from '../../src/services/alarmScheduler';
+import { formatTime, formatTime24, computeTriggerTime, computeAbsoluteTriggerTime } from '../../src/utils/timeUtils';
+import { COLORS } from '../../src/utils/constants';
+import type { AlarmType } from '../../src/models/types';
+
+export default function CreateAlarmScreen() {
+  const router = useRouter();
+  const addAlarm = useAlarmStore((s) => s.addAlarm);
+  const location = useLocationStore((s) => s.location);
+  const { todaySunTimes } = useSunTimes(location);
+
+  const [name, setName] = useState('');
+  const [alarmType, setAlarmType] = useState<AlarmType>('relative');
+
+  // Relative fields
+  const [referenceEvent, setReferenceEvent] = useState<'sunrise' | 'sunset'>('sunrise');
+  const [direction, setDirection] = useState<'before' | 'after'>('before');
+  const [hours, setHours] = useState(0);
+  const [minutes, setMinutes] = useState(30);
+
+  // Absolute fields
+  const [absoluteHour, setAbsoluteHour] = useState(6);
+  const [absoluteMinute, setAbsoluteMinute] = useState(0);
+
+  const offsetMinutes = useMemo(() => {
+    const total = hours * 60 + minutes;
+    return direction === 'before' ? -total : total;
+  }, [hours, minutes, direction]);
+
+  const previewTime = useMemo(() => {
+    if (alarmType === 'absolute') {
+      return computeAbsoluteTriggerTime(absoluteHour, absoluteMinute);
+    }
+    if (!todaySunTimes) return null;
+    const eventTime = todaySunTimes[referenceEvent];
+    return computeTriggerTime(eventTime, offsetMinutes);
+  }, [alarmType, todaySunTimes, referenceEvent, offsetMinutes, absoluteHour, absoluteMinute]);
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Name required', 'Please enter a name for your alarm.');
+      return;
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    const alarmId = addAlarm({
+      name: name.trim(),
+      type: alarmType,
+      referenceEvent,
+      offsetMinutes,
+      absoluteHour,
+      absoluteMinute,
+    });
+
+    // Schedule the alarm notification
+    const alarm = useAlarmStore.getState().alarms[alarmId];
+    if (alarm) {
+      const notificationId = await scheduleAlarm(alarm, todaySunTimes);
+      if (notificationId) {
+        useAlarmStore.getState().updateAlarm(alarmId, { notificationId });
+      }
+    }
+
+    router.back();
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+    <ScrollView
+      style={{ flex: 1, backgroundColor: COLORS.background }}
+      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Name */}
+      <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 8, marginLeft: 4 }}>
+        ALARM NAME
+      </Text>
+      <TextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g. Morning Run"
+        placeholderTextColor={COLORS.textMuted}
+        style={{
+          backgroundColor: COLORS.surface,
+          borderRadius: 12,
+          padding: 16,
+          color: COLORS.textPrimary,
+          fontSize: 16,
+          marginBottom: 24,
+        }}
+      />
+
+      {/* Alarm Type Toggle */}
+      <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 8, marginLeft: 4 }}>
+        ALARM TYPE
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
+        <Pressable
+          onPress={() => { Haptics.selectionAsync(); setAlarmType('relative'); }}
+          style={{
+            flex: 1,
+            paddingVertical: 14,
+            borderRadius: 12,
+            backgroundColor: alarmType === 'relative' ? COLORS.primary : COLORS.surface,
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ color: COLORS.textPrimary, fontSize: 15, fontWeight: alarmType === 'relative' ? '700' : '400' }}>
+            {'\u2600\uFE0F'} Sun-relative
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => { Haptics.selectionAsync(); setAlarmType('absolute'); }}
+          style={{
+            flex: 1,
+            paddingVertical: 14,
+            borderRadius: 12,
+            backgroundColor: alarmType === 'absolute' ? COLORS.primary : COLORS.surface,
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ color: COLORS.textPrimary, fontSize: 15, fontWeight: alarmType === 'absolute' ? '700' : '400' }}>
+            {'\u23F0'} Fixed time
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Conditional: Relative alarm fields */}
+      {alarmType === 'relative' && (
+        <>
+          {/* Reference Event */}
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 8, marginLeft: 4 }}>
+            RELATIVE TO
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
+            {(['sunrise', 'sunset'] as const).map((event) => (
+              <Pressable
+                key={event}
+                onPress={() => setReferenceEvent(event)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 14,
+                  borderRadius: 12,
+                  backgroundColor: referenceEvent === event ? (event === 'sunrise' ? COLORS.sunrise : COLORS.sunset) : COLORS.surface,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: COLORS.textPrimary, fontSize: 16, fontWeight: referenceEvent === event ? '700' : '400' }}>
+                  {event === 'sunrise' ? '\u2600\uFE0F Sunrise' : '\uD83C\uDF05 Sunset'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Direction */}
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 8, marginLeft: 4 }}>
+            DIRECTION
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
+            {(['before', 'after'] as const).map((dir) => (
+              <Pressable
+                key={dir}
+                onPress={() => setDirection(dir)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 14,
+                  borderRadius: 12,
+                  backgroundColor: direction === dir ? COLORS.primary : COLORS.surface,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: COLORS.textPrimary, fontSize: 16, fontWeight: direction === dir ? '700' : '400' }}>
+                  {dir === 'before' ? 'Before' : 'After'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Offset */}
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 8, marginLeft: 4 }}>
+            OFFSET TIME
+          </Text>
+          <View style={{ backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 24 }}>
+            <TimeOffsetPicker
+              hours={hours}
+              minutes={minutes}
+              onHoursChange={setHours}
+              onMinutesChange={setMinutes}
+            />
+          </View>
+        </>
+      )}
+
+      {/* Conditional: Absolute alarm fields */}
+      {alarmType === 'absolute' && (
+        <>
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 8, marginLeft: 4 }}>
+            ALARM TIME
+          </Text>
+          <View style={{ backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 24 }}>
+            <AbsoluteTimePicker
+              hour={absoluteHour}
+              minute={absoluteMinute}
+              onHourChange={setAbsoluteHour}
+              onMinuteChange={setAbsoluteMinute}
+            />
+          </View>
+        </>
+      )}
+
+      {/* Preview */}
+      {previewTime && (
+        <View style={{ backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 32, alignItems: 'center' }}>
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 4 }}>
+            ALARM WILL RING AT
+          </Text>
+          <Text style={{ color: COLORS.accent, fontSize: 28, fontWeight: '700' }}>
+            {formatTime(previewTime)}
+          </Text>
+          {alarmType === 'relative' && (
+            <Text style={{ color: COLORS.textMuted, fontSize: 13, marginTop: 4 }}>
+              Based on today's {referenceEvent}
+            </Text>
+          )}
+          {alarmType === 'absolute' && (
+            <Text style={{ color: COLORS.textMuted, fontSize: 13, marginTop: 4 }}>
+              Repeats daily
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Save */}
+      <Pressable
+        onPress={handleSave}
+        style={({ pressed }) => ({
+          backgroundColor: pressed ? '#d13550' : COLORS.primary,
+          borderRadius: 12,
+          paddingVertical: 16,
+          alignItems: 'center',
+        })}
+      >
+        <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '700' }}>
+          Save Alarm
+        </Text>
+      </Pressable>
+    </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
