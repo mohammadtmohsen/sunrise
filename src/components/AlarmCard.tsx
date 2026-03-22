@@ -9,7 +9,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import type { Alarm } from '../models/types';
-import { formatOffset, formatTime, formatTime24 } from '../utils/timeUtils';
+import { formatOffset, formatTime, formatTime24, formatTimeUntil } from '../utils/timeUtils';
 import { SunriseIcon, SunsetIcon, AlarmIcon } from './Icons';
 import { COLORS } from '../utils/constants';
 
@@ -100,25 +100,31 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
 
             {/* Info */}
             <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  color: COLORS.textPrimary,
-                  fontSize: 17,
-                  fontWeight: '600',
-                  marginBottom: 2,
-                }}
-                numberOfLines={1}
-              >
-                {alarm.name}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 }}>
+                <Text
+                  style={{
+                    color: COLORS.textPrimary,
+                    fontSize: 17,
+                    fontWeight: '600',
+                  }}
+                  numberOfLines={1}
+                >
+                  {alarm.name}
+                </Text>
+                {alarm.nextTriggerAt && alarm.isEnabled && (
+                  <Text style={{ color: COLORS.textPrimary, fontSize: 17, fontWeight: '700', marginLeft: 'auto', paddingLeft: 8 }}>
+                    {formatTime(new Date(alarm.nextTriggerAt))}
+                  </Text>
+                )}
+              </View>
               <Text style={{ color: eventColor, fontSize: 13, marginBottom: 2 }}>
                 {isAbsolute
                   ? `Daily at ${formatTime24(alarm.absoluteHour, alarm.absoluteMinute)}`
                   : `${formatOffset(alarm.offsetMinutes)} ${eventLabel.toLowerCase()}`}
               </Text>
               {alarm.nextTriggerAt && alarm.isEnabled && (
-                <Text style={{ color: COLORS.textMuted, fontSize: 12 }}>
-                  Next: {formatTime(new Date(alarm.nextTriggerAt))}
+                <Text style={{ color: COLORS.accent, fontSize: 12 }}>
+                  {formatTimeUntil(new Date(alarm.nextTriggerAt))}
                 </Text>
               )}
             </View>
