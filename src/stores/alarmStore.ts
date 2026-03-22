@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import * as Crypto from 'expo-crypto';
+
+
 import { zustandMMKVStorage } from './storage';
 import type { Alarm, AlarmType, SunTimes } from '../models/types';
 import { computeTriggerTime, computeAbsoluteTriggerTime } from '../utils/timeUtils';
@@ -37,7 +38,7 @@ export const useAlarmStore = create<AlarmState>()(
       alarms: {},
 
       addAlarm: (params) => {
-        const id = Crypto.randomUUID();
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
         const now = new Date().toISOString();
         const alarm: Alarm = {
           id,
