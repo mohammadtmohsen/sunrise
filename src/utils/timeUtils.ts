@@ -1,12 +1,19 @@
 import dayjs from 'dayjs';
 
+/**
+ * Format a Date to a time string following the device's locale and 12h/24h preference.
+ */
 export function formatTime(date: Date): string {
-  return dayjs(date).format('h:mm A');
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * Format an hour+minute to a time string following the device's locale and 12h/24h preference.
+ */
 export function formatTime24(hour: number, minute: number): string {
-  const d = dayjs().hour(hour).minute(minute);
-  return d.format('h:mm A');
+  const d = new Date();
+  d.setHours(hour, minute, 0, 0);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 export function formatTimeUntil(date: Date): string {
