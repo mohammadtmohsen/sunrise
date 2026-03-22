@@ -131,6 +131,7 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
 
             {/* Toggle */}
             <Switch
+              style={{ marginLeft: 12 }}
               value={alarm.isEnabled}
               onValueChange={() => onToggle(alarm.id)}
               trackColor={{ false: COLORS.border, true: eventColor }}
