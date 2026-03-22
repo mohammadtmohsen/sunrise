@@ -19,13 +19,15 @@ export function formatTime24(hour: number, minute: number): string {
 export function formatTimeUntil(date: Date): string {
   const now = dayjs();
   let target = dayjs(date);
-  let prefix = '';
 
-  // If the time has passed today, show countdown to tomorrow's occurrence
+  // If the time has passed, shift to next day
   if (target.isBefore(now)) {
     target = target.add(1, 'day');
-    prefix = 'tomorrow ';
   }
+
+  // "tomorrow" if the target is not today
+  const isToday = target.isSame(now, 'day');
+  const prefix = isToday ? '' : 'tomorrow ';
 
   const diffMinutes = target.diff(now, 'minute');
   if (diffMinutes < 1) return `${prefix}in <1m`;
