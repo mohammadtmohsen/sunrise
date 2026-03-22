@@ -7,6 +7,7 @@ import { useAlarms } from '../../src/hooks/useAlarms';
 import { cancelAlarm } from '../../src/services/alarmScheduler';
 import { useAlarmStore } from '../../src/stores/alarmStore';
 import { AlarmCard } from '../../src/components/AlarmCard';
+import { SunTimesDisplay } from '../../src/components/SunTimesDisplay';
 import { PermissionBanner } from '../../src/components/PermissionBanner';
 import { BatteryOptimizationPrompt } from '../../src/components/BatteryOptimizationPrompt';
 import { SettingsIcon, AlarmIcon } from '../../src/components/Icons';
@@ -16,7 +17,7 @@ import type { Alarm } from '../../src/models/types';
 export default function HomeScreen() {
   const router = useRouter();
   const { location, isLoading: locationLoading, fetchLocation } = useLocation();
-  const { todaySunTimes } = useSunTimes(location);
+  const { todaySunTimes, isValid } = useSunTimes(location);
   const { alarms, toggleAlarm } = useAlarms(todaySunTimes);
 
   const handleAlarmPress = useCallback(
@@ -52,6 +53,9 @@ export default function HomeScreen() {
   const renderHeader = useCallback(
     () => (
       <View style={{ paddingTop: 8, paddingBottom: 8 }}>
+        {/* Sun times — scrolls with the list */}
+        <SunTimesDisplay sunTimes={todaySunTimes} isValid={isValid} isRefreshing={locationLoading} />
+
         <PermissionBanner />
         <BatteryOptimizationPrompt />
 
@@ -62,12 +66,14 @@ export default function HomeScreen() {
             justifyContent: 'space-between',
             alignItems: 'center',
             paddingHorizontal: 16,
+            marginTop: 16,
             marginBottom: 12,
           }}
         >
+          <Text style={{ color: COLORS.textPrimary, fontSize: 18, fontWeight: '600' }}>Alarms</Text>
           <Pressable
             onPress={() => router.push('/settings')}
-            style={{ padding: 8, marginLeft: -8 }}
+            style={{ padding: 8, marginRight: -8 }}
             accessibilityLabel="Settings"
             accessibilityRole="button"
           >
@@ -76,7 +82,7 @@ export default function HomeScreen() {
         </View>
       </View>
     ),
-    [router],
+    [router, todaySunTimes, isValid, locationLoading],
   );
 
   const renderEmpty = useCallback(
@@ -128,8 +134,7 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={locationLoading}
             onRefresh={fetchLocation}
-            tintColor={'transparent'}
-            colors={['transparent']}
+            tintColor={COLORS.primary}
           />
         }
       />

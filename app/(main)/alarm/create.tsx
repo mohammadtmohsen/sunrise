@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, RefreshControl, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useAlarmStore } from '../../../src/stores/alarmStore';
-import { useLocationStore } from '../../../src/stores/locationStore';
+import { useLocation } from '../../../src/hooks/useLocation';
 import { useSunTimes } from '../../../src/hooks/useSunTimes';
 import { TimeOffsetPicker } from '../../../src/components/TimeOffsetPicker';
 import { AbsoluteTimePicker } from '../../../src/components/AbsoluteTimePicker';
@@ -16,7 +16,7 @@ import type { AlarmType } from '../../../src/models/types';
 export default function CreateAlarmScreen() {
   const router = useRouter();
   const addAlarm = useAlarmStore((s) => s.addAlarm);
-  const location = useLocationStore((s) => s.location);
+  const { location, isLoading: locationLoading, fetchLocation } = useLocation();
   const { todaySunTimes } = useSunTimes(location);
 
   const [name, setName] = useState('');
@@ -85,6 +85,13 @@ export default function CreateAlarmScreen() {
       style={{ flex: 1, backgroundColor: COLORS.background }}
       contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={locationLoading}
+          onRefresh={fetchLocation}
+          tintColor={COLORS.primary}
+        />
+      }
     >
       {/* Name */}
       <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 8, marginLeft: 4 }}>

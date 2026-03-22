@@ -15,6 +15,7 @@ import { scheduleNextDayAlarm } from '../src/services/nextDayScheduler';
 import { useAppStateRecalculation } from '../src/hooks/useAppStateRecalculation';
 import { registerBackgroundRecalculation } from '../src/tasks/backgroundRecalculate';
 import { useSettingsStore } from '../src/stores/settingsStore';
+import { AppHeader } from '../src/components/AppHeader';
 import { COLORS } from '../src/utils/constants';
 
 export default function RootLayout() {
@@ -92,11 +93,15 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: COLORS.background },
-          headerTintColor: COLORS.textPrimary,
-          headerTitleStyle: { fontWeight: '600' },
           contentStyle: { backgroundColor: COLORS.background },
           animation: 'slide_from_right',
+          header: ({ options, navigation }) => {
+            const title = options.title ?? '';
+            const canGoBack = navigation.canGoBack();
+            return (
+              <AppHeader title={title} canGoBack={canGoBack} onBack={() => navigation.goBack()} />
+            );
+          },
         }}
       >
         <Stack.Screen
