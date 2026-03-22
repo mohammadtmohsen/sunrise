@@ -19,20 +19,22 @@ export function formatTime24(hour: number, minute: number): string {
 export function formatTimeUntil(date: Date): string {
   const now = dayjs();
   let target = dayjs(date);
+  let prefix = '';
 
   // If the time has passed today, show countdown to tomorrow's occurrence
   if (target.isBefore(now)) {
     target = target.add(1, 'day');
+    prefix = 'tomorrow ';
   }
 
   const diffMinutes = target.diff(now, 'minute');
-  if (diffMinutes < 1) return 'in <1m';
-  if (diffMinutes < 60) return `in ${diffMinutes}m`;
+  if (diffMinutes < 1) return `${prefix}in <1m`;
+  if (diffMinutes < 60) return `${prefix}in ${diffMinutes}m`;
 
   const hours = Math.floor(diffMinutes / 60);
   const mins = diffMinutes % 60;
-  if (mins === 0) return `in ${hours}h`;
-  return `in ${hours}h ${mins}m`;
+  if (mins === 0) return `${prefix}in ${hours}h`;
+  return `${prefix}in ${hours}h ${mins}m`;
 }
 
 export function formatOffset(offsetMinutes: number): string {
