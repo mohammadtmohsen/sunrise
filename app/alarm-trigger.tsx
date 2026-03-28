@@ -17,22 +17,47 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
-  withDelay,
   runOnJS,
   Easing,
-  interpolateColor,
+  interpolate,
 } from 'react-native-reanimated';
+import Svg, {
+  Circle,
+  Line,
+  Path,
+  Defs,
+  LinearGradient,
+  RadialGradient,
+  Stop,
+} from 'react-native-svg';
 import notifee from '@notifee/react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useAlarmStore } from '../src/stores/alarmStore';
 import { playAlarmSound, stopAlarmSound } from '../src/services/soundService';
 import { dismissAlarm, scheduleSnooze } from '../src/services/alarmScheduler';
 import { scheduleNextDayAlarm } from '../src/services/nextDayScheduler';
-import { SunriseIcon, SunsetIcon } from '../src/components/Icons';
+import { formatTime } from '../src/utils/timeUtils';
 import { COLORS } from '../src/utils/constants';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const DISMISS_THRESHOLD = -150;
+const DISMISS_THRESHOLD = -180;
+
+// Arc dimensions
+const ARC_W = 260;
+const ARC_H = 130;
+const HORIZON_Y = ARC_H - 10;
+const SUN_R = 10;
+
+function buildArc(w: number, _h: number, horizonY: number): string {
+  const startX = 20;
+  const endX = w - 20;
+  const peakY = 16;
+  const cpX1 = startX + (endX - startX) * 0.25;
+  const cpY1 = peakY - 10;
+  const cpX2 = startX + (endX - startX) * 0.75;
+  const cpY2 = peakY - 10;
+  return `M${startX},${horizonY} C${cpX1},${cpY1} ${cpX2},${cpY2} ${endX},${horizonY}`;
+}
 
 export default function AlarmTriggerScreen() {
   const { alarmId } = useLocalSearchParams<{ alarmId: string }>();
@@ -40,30 +65,22 @@ export default function AlarmTriggerScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const translateY = useSharedValue(0);
-  const pulseScale = useSharedValue(1);
-  const glowOpacity = useSharedValue(0.3);
-  const chevronY = useSharedValue(0);
-  const bgProgress = useSharedValue(0);
+  const breathe = useSharedValue(0);
 
-  // Update clock every second
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Start alarm sound, keep screen awake, and hide the notification badge
   useEffect(() => {
     activateKeepAwakeAsync('alarm-trigger');
 
     async function setup() {
       if (Platform.OS === 'android' && alarmId) {
-        // Stop the foreground service and cancel the alarm notification badge.
-        // The alarm-trigger screen is now showing, so we play sound directly.
         try { await notifee.stopForegroundService(); } catch {}
         try { await notifee.cancelNotification(alarmId); } catch {}
         try { await notifee.cancelNotification(`${alarmId}-snooze`); } catch {}
       }
-      // Play sound directly in the screen on all platforms
       await playAlarmSound();
     }
     setup();
@@ -74,41 +91,13 @@ export default function AlarmTriggerScreen() {
     };
   }, [alarmId]);
 
-  // Animations
+  // Gentle breathing animation for the sun dot
   useEffect(() => {
-    // Pulsing icon
-    pulseScale.value = withRepeat(
+    breathe.value = withRepeat(
       withSequence(
-        withTiming(1.12, { duration: 600, easing: Easing.out(Easing.cubic) }),
-        withTiming(1, { duration: 600, easing: Easing.in(Easing.cubic) }),
+        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.cubic) }),
+        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.cubic) }),
       ),
-      -1,
-      true,
-    );
-
-    // Glow effect
-    glowOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.6, { duration: 1000 }),
-        withTiming(0.2, { duration: 1000 }),
-      ),
-      -1,
-      true,
-    );
-
-    // Bouncing chevron hint
-    chevronY.value = withRepeat(
-      withSequence(
-        withTiming(-8, { duration: 600, easing: Easing.out(Easing.cubic) }),
-        withTiming(0, { duration: 600, easing: Easing.in(Easing.cubic) }),
-      ),
-      -1,
-      true,
-    );
-
-    // Slow background color transition (sunrise effect)
-    bgProgress.value = withRepeat(
-      withTiming(1, { duration: 8000, easing: Easing.linear }),
       -1,
       true,
     );
@@ -131,7 +120,6 @@ export default function AlarmTriggerScreen() {
     BackHandler.exitApp();
   }, [alarm]);
 
-  // Swipe up to dismiss
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       if (event.translationY < 0) {
@@ -149,66 +137,90 @@ export default function AlarmTriggerScreen() {
 
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
+    opacity: interpolate(translateY.value, [0, -SCREEN_HEIGHT], [1, 0.3]),
   }));
 
-  const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
+  const sunGlowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(breathe.value, [0, 1], [0.3, 0.6]),
   }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
-  }));
-
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: chevronY.value }],
-  }));
-
-  const bgStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      bgProgress.value,
-      [0, 0.5, 1],
-      ['#1a1a2e', '#2a1a2e', '#1a1a2e'],
-    ),
-  }));
-
-  const timeString = currentTime.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 
   const isSunrise = alarm?.referenceEvent === 'sunrise' || !alarm;
   const eventColor = isSunrise ? COLORS.sunrise : COLORS.sunset;
+  const snoozeMins = alarm?.snoozeDurationMinutes ?? 5;
+
+  // Sun sits at the peak of the arc
+  const sunX = ARC_W / 2;
+  const sunY = 16;
+
+  const arcPath = buildArc(ARC_W, ARC_H, HORIZON_Y);
 
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View
-        style={[styles.container, containerStyle, bgStyle]}
-        accessibilityRole='alert'
+        style={[styles.container, containerStyle]}
+        accessibilityRole="alert"
         accessibilityLabel={`Alarm: ${alarm?.name ?? 'Alarm'}. Swipe up to dismiss.`}
       >
-        {/* Glow behind icon */}
-        <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              top: '22%',
-              width: 200,
-              height: 200,
-              borderRadius: 100,
-              backgroundColor: eventColor,
-            },
-            glowStyle,
-          ]}
-        />
+        {/* Arc illustration */}
+        <View style={styles.arcArea}>
+          <Svg width={ARC_W} height={ARC_H}>
+            <Defs>
+              <LinearGradient id="arcStroke" x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0%" stopColor={eventColor} stopOpacity={0.1} />
+                <Stop offset="50%" stopColor={eventColor} stopOpacity={0.4} />
+                <Stop offset="100%" stopColor={eventColor} stopOpacity={0.1} />
+              </LinearGradient>
+              <RadialGradient id="dotGlow" cx="50%" cy="50%" r="50%">
+                <Stop offset="0%" stopColor={eventColor} stopOpacity={0.4} />
+                <Stop offset="100%" stopColor={eventColor} stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
 
-        {/* Icon */}
-        <Animated.View style={[{ marginBottom: 24 }, pulseStyle]}>
-          {isSunrise ? <SunriseIcon size={80} /> : <SunsetIcon size={80} />}
-        </Animated.View>
+            {/* Horizon */}
+            <Line
+              x1={20} y1={HORIZON_Y} x2={ARC_W - 20} y2={HORIZON_Y}
+              stroke="rgba(255,255,255,0.06)"
+              strokeWidth={0.5}
+            />
+
+            {/* Arc curve */}
+            <Path
+              d={arcPath}
+              stroke="url(#arcStroke)"
+              strokeWidth={1.5}
+              fill="none"
+              strokeLinecap="round"
+            />
+
+            {/* Sun glow (animated via wrapper) */}
+          </Svg>
+
+          {/* Animated glow behind sun */}
+          <Animated.View style={[{
+            position: 'absolute',
+            left: sunX - 24,
+            top: sunY - 24,
+          }, sunGlowStyle]}>
+            <Svg width={48} height={48}>
+              <Circle cx={24} cy={24} r={24} fill="url(#dotGlow)" />
+            </Svg>
+          </Animated.View>
+
+          {/* Sun dot */}
+          <View style={{
+            position: 'absolute',
+            left: sunX - SUN_R,
+            top: sunY - SUN_R,
+            width: SUN_R * 2,
+            height: SUN_R * 2,
+            borderRadius: SUN_R,
+            backgroundColor: '#ffffff',
+          }} />
+        </View>
 
         {/* Time */}
-        <Text style={[styles.time, { color: COLORS.textPrimary }]}>
-          {timeString}
+        <Text style={styles.time}>
+          {formatTime(currentTime)}
         </Text>
 
         {/* Alarm name */}
@@ -216,45 +228,28 @@ export default function AlarmTriggerScreen() {
           {alarm?.name ?? 'Alarm'}
         </Text>
 
+        {/* Spacer */}
+        <View style={{ flex: 1 }} />
+
+        {/* Snooze */}
+        <Pressable
+          onPress={handleSnooze}
+          style={({ pressed }) => [
+            styles.snoozeButton,
+            { backgroundColor: pressed ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)' },
+          ]}
+          accessibilityLabel={`Snooze for ${snoozeMins} minutes`}
+          accessibilityRole="button"
+        >
+          <Text style={styles.snoozeText}>
+            Snooze · {snoozeMins} min
+          </Text>
+        </Pressable>
+
         {/* Swipe hint */}
         <View style={styles.hintContainer}>
-          <Animated.View style={chevronStyle}>
-            <Text style={[styles.chevron, { color: COLORS.textMuted }]}>▲</Text>
-          </Animated.View>
-          <Text style={[styles.hintText, { color: COLORS.textMuted }]}>
-            Swipe up to dismiss
-          </Text>
-        </View>
-
-        {/* Buttons */}
-        <View style={styles.buttonContainer}>
-          <Pressable
-            onPress={handleDismiss}
-            style={({ pressed }) => [
-              styles.dismissButton,
-              { backgroundColor: pressed ? '#d13550' : COLORS.primary },
-            ]}
-            accessibilityLabel='Dismiss alarm'
-            accessibilityRole='button'
-          >
-            <Text style={styles.dismissText}>Dismiss</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleSnooze}
-            style={({ pressed }) => [
-              styles.snoozeButton,
-              {
-                backgroundColor: pressed ? COLORS.surfaceLight : COLORS.surface,
-              },
-            ]}
-            accessibilityLabel={`Snooze for ${alarm?.snoozeDurationMinutes ?? 5} minutes`}
-            accessibilityRole='button'
-          >
-            <Text style={styles.snoozeText}>
-              Snooze {alarm?.snoozeDurationMinutes ?? 5} min
-            </Text>
-          </Pressable>
+          <View style={styles.swipeBar} />
+          <Text style={styles.hintText}>swipe up to dismiss</Text>
         </View>
       </Animated.View>
     </GestureDetector>
@@ -265,54 +260,58 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
+    backgroundColor: '#0d0d1a',
+    paddingTop: SCREEN_HEIGHT * 0.12,
+    paddingHorizontal: 32,
+    paddingBottom: 24,
+  },
+  arcArea: {
+    width: ARC_W,
+    height: ARC_H,
+    marginBottom: 16,
   },
   time: {
-    fontSize: 56,
+    color: '#ffffff',
+    fontSize: 64,
     fontWeight: '200',
-    letterSpacing: 2,
+    letterSpacing: 4,
     marginBottom: 8,
   },
   name: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '600',
-    marginBottom: 8,
-  },
-  hintContainer: {
-    marginTop: 4,
-    marginBottom: 60,
-    alignItems: 'center',
-  },
-  chevron: {
-    fontSize: 28,
-    marginBottom: 2,
-  },
-  hintText: {
-    fontSize: 15,
-  },
-  buttonContainer: {
-    width: '100%',
-    gap: 12,
-  },
-  dismissButton: {
-    paddingVertical: 18,
-    borderRadius: 30,
-    alignItems: 'center',
-  },
-  dismissText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   snoozeButton: {
+    width: '100%',
     paddingVertical: 18,
-    borderRadius: 30,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
+    marginBottom: 32,
   },
   snoozeText: {
-    color: COLORS.textSecondary,
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+    letterSpacing: 0.5,
+  },
+  hintContainer: {
+    alignItems: 'center',
+    gap: 8,
+    paddingBottom: 16,
+  },
+  swipeBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  hintText: {
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 13,
+    fontWeight: '400',
+    letterSpacing: 0.5,
   },
 });
