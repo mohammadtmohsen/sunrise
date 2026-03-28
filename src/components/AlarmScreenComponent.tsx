@@ -22,6 +22,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import notifee from '@notifee/react-native';
 import { playAlarmSound, stopAlarmSound } from '../services/soundService';
+import { scheduleSnooze } from '../services/alarmScheduler';
+import { useAlarmStore } from '../stores/alarmStore';
 import { SunriseIcon } from './Icons';
 import { COLORS } from '../utils/constants';
 
@@ -86,9 +88,16 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
 
   const handleSnooze = useCallback(async () => {
     await stopAlarmSound();
-    // Snooze scheduling is handled by the background event handler
-    // Just cancel the current notification display
     if (alarmId) {
+      // Actually schedule the snooze alarm before cancelling
+      const alarm = useAlarmStore.getState().alarms[alarmId];
+      if (alarm) {
+        try {
+          await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
+        } catch (e) {
+          console.warn('[AlarmScreen] Failed to schedule snooze:', e);
+        }
+      }
       try {
         await notifee.cancelNotification(alarmId);
       } catch {

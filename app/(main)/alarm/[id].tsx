@@ -7,7 +7,7 @@ import { useLocation } from '../../../src/hooks/useLocation';
 import { useSunTimes } from '../../../src/hooks/useSunTimes';
 import { TimeOffsetPicker } from '../../../src/components/TimeOffsetPicker';
 import { AbsoluteTimePicker } from '../../../src/components/AbsoluteTimePicker';
-import { scheduleAlarm, cancelAlarm } from '../../../src/services/alarmScheduler';
+import { scheduleAlarm, cancelAlarm, type ScheduleFailure } from '../../../src/services/alarmScheduler';
 import { updatePersistentNotification } from '../../../src/services/persistentNotificationService';
 import { formatTime, computeTriggerTime, computeAbsoluteTriggerTime } from '../../../src/utils/timeUtils';
 import { SunriseIcon } from '../../../src/components/Icons';
@@ -87,16 +87,21 @@ export default function EditAlarmScreen() {
     });
 
     // Reschedule
-    try {
-      const updated = useAlarmStore.getState().alarms[id!];
-      if (updated && updated.isEnabled) {
-        const notificationId = await scheduleAlarm(updated, todaySunTimes);
-        if (notificationId) {
-          updateAlarm(id!, { notificationId });
-        }
+    const updated = useAlarmStore.getState().alarms[id!];
+    if (updated && updated.isEnabled) {
+      const result = await scheduleAlarm(updated, todaySunTimes);
+      if (result.success) {
+        updateAlarm(id!, { notificationId: result.notificationId });
+      } else {
+        const messages: Record<ScheduleFailure, string> = {
+          'disabled': 'The alarm is disabled.',
+          'no-sun-times': 'Location not available yet. Pull down to refresh location, then try again.',
+          'past-time': 'The alarm time has already passed for today. It will be scheduled for tomorrow.',
+          'no-permission': 'Alarm permission was not granted. Please enable it in Settings and save the alarm again.',
+          'error': 'Something went wrong scheduling the alarm. Please try again.',
+        };
+        Alert.alert('Alarm Not Scheduled', messages[result.reason]);
       }
-    } catch (e) {
-      console.warn('Failed to schedule alarm:', e);
     }
 
     updatePersistentNotification();

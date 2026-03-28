@@ -31,23 +31,129 @@ async function ensureExactAlarmPermission(): Promise<boolean> {
     // android.alarm is 1 (ENABLED) if exact alarms are allowed
     if (settings.android?.alarm === 1) return true;
 
-    // Prompt user to enable it
-    Alert.alert(
-      'Exact Alarm Permission Required',
-      'Lumora needs permission to schedule exact alarms. Please enable "Alarms & reminders" for Lumora in the next screen.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Open Settings',
-          onPress: () => notifee.openAlarmPermissionSettings(),
-        },
-      ],
-    );
-    return false;
+    // Wait for user to choose an action before returning
+    const granted = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Exact Alarm Permission Required',
+        'Lumora needs "Alarms & reminders" permission to schedule alarms. Please enable it in Settings, then save the alarm again.',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          {
+            text: 'Open Settings',
+            onPress: async () => {
+              try {
+                await notifee.openAlarmPermissionSettings();
+              } catch {
+                // Settings may not be available
+              }
+              resolve(false);
+            },
+          },
+        ],
+        { cancelable: false },
+      );
+    });
+
+    return granted;
   } catch {
     // If we can't check, try anyway
     return true;
   }
+}
+
+/**
+ * Detect Xiaomi/Redmi/POCO devices running MIUI/HyperOS.
+ */
+function isXiaomiDevice(): boolean {
+  if (Platform.OS !== 'android') return false;
+  const constants = Platform.constants as Record<string, unknown>;
+  const brand = String(constants.Brand ?? '').toLowerCase();
+  const manufacturer = String(constants.Manufacturer ?? '').toLowerCase();
+  return (
+    brand.includes('xiaomi') ||
+    brand.includes('redmi') ||
+    brand.includes('poco') ||
+    manufacturer.includes('xiaomi')
+  );
+}
+
+/**
+ * Prompt user to enable permissions required for alarms to show over the lock screen.
+ * On Xiaomi/Redmi (MIUI), the standard Android full-screen intent setting doesn't exist —
+ * users need to enable Autostart + "Display pop-up windows while running in background".
+ */
+export async function promptFullScreenIntentPermission(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  if (isXiaomiDevice()) {
+    await new Promise<void>((resolve) => {
+      Alert.alert(
+        'Xiaomi/Redmi: Extra Permissions Needed',
+        'For alarms to show over the lock screen, please enable these settings:\n\n'
+        + '1. Settings > Apps > Manage apps > Lumora > Autostart → Enable\n\n'
+        + '2. Settings > Apps > Manage apps > Lumora > Other permissions → Enable "Display pop-up windows while running in the background"\n\n'
+        + '3. Settings > Battery > Lumora → Set to "No restrictions"\n\n'
+        + 'Tap "Open Settings" to go to the app info page.',
+        [
+          { text: 'Later', style: 'cancel', onPress: () => resolve() },
+          {
+            text: 'Open Settings',
+            onPress: async () => {
+              try {
+                await Linking.openSettings();
+              } catch {
+                // ignore
+              }
+              resolve();
+            },
+          },
+          {
+            text: 'Battery Settings',
+            onPress: async () => {
+              try {
+                await notifee.openBatteryOptimizationSettings();
+              } catch {
+                try { await Linking.openSettings(); } catch { /* ignore */ }
+              }
+              resolve();
+            },
+          },
+        ],
+        { cancelable: false },
+      );
+    });
+    return;
+  }
+
+  // Standard Android — prompt for full-screen intent permission
+  await new Promise<void>((resolve) => {
+    Alert.alert(
+      'Full-Screen Alarm Permission',
+      'To show alarms over the lock screen, please enable "Full-screen notifications" for Lumora in Settings.',
+      [
+        { text: 'Later', style: 'cancel', onPress: () => resolve() },
+        {
+          text: 'Open Settings',
+          onPress: async () => {
+            try {
+              await Linking.sendIntent(
+                'android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT',
+                [{ key: 'package', value: 'com.lumora.app' }],
+              );
+            } catch {
+              try {
+                await notifee.openNotificationSettings();
+              } catch {
+                // ignore
+              }
+            }
+            resolve();
+          },
+        },
+      ],
+      { cancelable: false },
+    );
+  });
 }
 
 /**
@@ -81,6 +187,17 @@ function getAlarmBody(alarm: Alarm, triggerTime: Date): string {
   return `${offsetLabel} ${eventLabel.toLowerCase()} \u2022 ${formatTime(triggerTime)}`;
 }
 
+export type ScheduleFailure =
+  | 'disabled'
+  | 'no-sun-times'
+  | 'past-time'
+  | 'no-permission'
+  | 'error';
+
+export type ScheduleResult =
+  | { success: true; notificationId: string }
+  | { success: false; reason: ScheduleFailure };
+
 /**
  * Schedule a single alarm via Notifee.
  * Supports both relative (sunrise/sunset) and absolute (fixed time) alarms.
@@ -90,96 +207,103 @@ function getAlarmBody(alarm: Alarm, triggerTime: Date): string {
 export async function scheduleAlarm(
   alarm: Alarm,
   sunTimes: SunTimes | null,
-): Promise<string | null> {
-  if (!alarm.isEnabled) return null;
+): Promise<ScheduleResult> {
+  if (!alarm.isEnabled) return { success: false, reason: 'disabled' };
 
   const triggerTime = getAlarmTriggerTime(alarm, sunTimes);
-  if (!triggerTime) return null;
+  if (!triggerTime) return { success: false, reason: 'no-sun-times' };
 
   // If trigger time is in the past, don't schedule
   if (triggerTime.getTime() <= Date.now()) {
-    return null;
+    return { success: false, reason: 'past-time' };
   }
 
   // Ensure exact alarm permission on Android 12+
   const canSchedule = await ensureExactAlarmPermission();
-  if (!canSchedule) return null;
+  if (!canSchedule) return { success: false, reason: 'no-permission' };
 
   // Cancel existing notification for this alarm if any
   await cancelAlarm(alarm);
 
   const body = getAlarmBody(alarm, triggerTime);
 
-  const notificationId = await notifee.createTriggerNotification(
-    {
-      id: alarm.id,
-      title: alarm.name,
-      body,
-      data: {
-        alarmId: alarm.id,
-        alarmName: alarm.name,
-        type: 'alarm-trigger',
-      },
-      android: {
-        channelId: ALARM_CHANNEL_ID,
-        category: AndroidCategory.ALARM,
-        importance: AndroidImportance.HIGH,
-        visibility: AndroidVisibility.PUBLIC,
-        sound: 'default',
-        vibrationPattern: [500, 200, 500, 200],
-        lightUpScreen: true,
-        autoCancel: false,
-        ongoing: true,
-        asForegroundService: true,
-        fullScreenAction: {
-          id: 'default',
-          launchActivity: 'default',
-          launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
+  try {
+    const notificationId = await notifee.createTriggerNotification(
+      {
+        id: alarm.id,
+        title: alarm.name,
+        body,
+        data: {
+          alarmId: alarm.id,
+          alarmName: alarm.name,
+          type: 'alarm-trigger',
         },
-        pressAction: {
-          id: 'default',
-          launchActivity: 'default',
-        },
-        actions: [
-          {
-            title: 'Dismiss',
-            pressAction: { id: 'dismiss' },
+        android: {
+          channelId: ALARM_CHANNEL_ID,
+          category: AndroidCategory.ALARM,
+          importance: AndroidImportance.HIGH,
+          visibility: AndroidVisibility.PUBLIC,
+          sound: 'default',
+          vibrationPattern: [500, 200, 500, 200],
+          lightUpScreen: true,
+          autoCancel: false,
+          ongoing: true,
+          asForegroundService: true,
+          fullScreenAction: {
+            id: 'default',
+            launchActivity: 'default',
+            launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
           },
-          {
-            title: 'Snooze',
-            pressAction: { id: 'snooze' },
+          pressAction: {
+            id: 'default',
+            launchActivity: 'default',
+            launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
           },
-        ],
-        style: {
-          type: AndroidStyle.BIGTEXT,
-          text: `${alarm.name}\n${body}`,
+          actions: [
+            {
+              title: 'Dismiss',
+              pressAction: { id: 'dismiss' },
+            },
+            {
+              title: 'Snooze',
+              pressAction: { id: 'snooze' },
+            },
+          ],
+          style: {
+            type: AndroidStyle.BIGTEXT,
+            text: `${alarm.name}\n${body}`,
+          },
+        },
+        ios: {
+          critical: true,
+          criticalVolume: 1.0,
+          sound: 'alarm-default.caf',
+          interruptionLevel: 'timeSensitive',
+          categoryId: 'alarm-actions',
+          foregroundPresentationOptions: {
+            banner: true,
+            sound: true,
+            badge: false,
+            list: true,
+          },
         },
       },
-      ios: {
-        critical: true,
-        criticalVolume: 1.0,
-        sound: 'alarm-default.caf',
-        interruptionLevel: 'timeSensitive',
-        categoryId: 'alarm-actions',
-        foregroundPresentationOptions: {
-          banner: true,
-          sound: true,
-          badge: false,
-          list: true,
+      {
+        type: TriggerType.TIMESTAMP,
+        timestamp: triggerTime.getTime(),
+        alarmManager: {
+          type: AlarmType.SET_ALARM_CLOCK,
+          allowWhileIdle: true,
         },
       },
-    },
-    {
-      type: TriggerType.TIMESTAMP,
-      timestamp: triggerTime.getTime(),
-      alarmManager: {
-        type: AlarmType.SET_ALARM_CLOCK,
-        allowWhileIdle: true,
-      },
-    },
-  );
+    );
 
-  return notificationId;
+    console.log('[scheduleAlarm] Scheduled:', alarm.id, 'at', triggerTime.toISOString());
+    return { success: true, notificationId };
+  } catch (error) {
+    console.error('[scheduleAlarm] Failed to create trigger notification:', error);
+    return { success: false, reason: 'error' };
+  }
 }
 
 /**
@@ -207,8 +331,8 @@ export async function cancelAlarm(alarm: Alarm): Promise<void> {
 export async function scheduleAllAlarms(
   alarms: Alarm[],
   sunTimes: SunTimes | null,
-): Promise<Record<string, string | null>> {
-  const results: Record<string, string | null> = {};
+): Promise<Record<string, ScheduleResult>> {
+  const results: Record<string, ScheduleResult> = {};
 
   for (const alarm of alarms) {
     if (alarm.isEnabled) {
@@ -261,12 +385,14 @@ export async function scheduleSnooze(
         asForegroundService: true,
         fullScreenAction: {
           id: 'default',
+          mainComponent: 'alarm-screen',
           launchActivity: 'default',
           launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
         },
         pressAction: {
           id: 'default',
           launchActivity: 'default',
+          launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
         },
         actions: [
           {

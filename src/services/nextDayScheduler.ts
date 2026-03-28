@@ -16,9 +16,9 @@ export async function scheduleNextDayAlarm(alarmId: string): Promise<void> {
 
   if (alarm.type === 'absolute') {
     // Absolute alarms don't need sun times
-    const notificationId = await scheduleAlarm(alarm, null);
-    if (notificationId) {
-      useAlarmStore.getState().updateAlarm(alarmId, { notificationId });
+    const result = await scheduleAlarm(alarm, null);
+    if (result.success) {
+      useAlarmStore.getState().updateAlarm(alarmId, { notificationId: result.notificationId });
     }
     return;
   }
@@ -34,8 +34,8 @@ export async function scheduleNextDayAlarm(alarmId: string): Promise<void> {
 
   if (!isSunTimesValid(tomorrowSunTimes)) return;
 
-  const notificationId = await scheduleAlarm(alarm, tomorrowSunTimes);
-  if (notificationId) {
-    useAlarmStore.getState().updateAlarm(alarmId, { notificationId });
+  const result = await scheduleAlarm(alarm, tomorrowSunTimes);
+  if (result.success) {
+    useAlarmStore.getState().updateAlarm(alarmId, { notificationId: result.notificationId });
   }
 }

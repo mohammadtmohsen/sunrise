@@ -7,20 +7,19 @@ import notifee, { EventType } from '@notifee/react-native';
 import { useLocation } from '../src/hooks/useLocation';
 import { useAlarmStore } from '../src/stores/alarmStore';
 import { mmkv } from '../src/stores/storage';
-import { Alert } from 'react-native';
 import {
   setupNotificationChannel,
   setupStatusNotificationChannel,
   requestNotificationPermission,
   setupIOSCategories,
-  needsFullScreenIntentPermission,
-  openFullScreenIntentSettings,
 } from '../src/services/notificationService';
+
 import { updatePersistentNotification } from '../src/services/persistentNotificationService';
 import { dismissAlarm, scheduleSnooze } from '../src/services/alarmScheduler';
 import { stopAlarmSound } from '../src/services/soundService';
 import { scheduleNextDayAlarm } from '../src/services/nextDayScheduler';
 import { useAppStateRecalculation } from '../src/hooks/useAppStateRecalculation';
+import { useRescheduleOnResume } from '../src/hooks/useRescheduleOnResume';
 import { registerBackgroundRecalculation } from '../src/tasks/backgroundRecalculate';
 import { useSettingsStore } from '../src/stores/settingsStore';
 import { AppHeader } from '../src/components/AppHeader';
@@ -31,6 +30,7 @@ export default function RootLayout() {
   const { location, fetchLocation } = useLocation();
 
   useAppStateRecalculation();
+  useRescheduleOnResume();
 
   useEffect(() => {
     if (!location) {
@@ -47,21 +47,6 @@ export default function RootLayout() {
       await registerBackgroundRecalculation();
       useSettingsStore.getState().setOnboardingComplete();
       await updatePersistentNotification();
-
-      // Prompt for full-screen intent permission on Android 14+
-      if (needsFullScreenIntentPermission()) {
-        Alert.alert(
-          'Full-Screen Alarm Permission',
-          'Lumora needs permission to show alarms over the lock screen. Please enable "Allow full-screen notifications" on the next screen.',
-          [
-            { text: 'Later', style: 'cancel' },
-            {
-              text: 'Open Settings',
-              onPress: () => openFullScreenIntentSettings(),
-            },
-          ],
-        );
-      }
     }
     init();
   }, []);

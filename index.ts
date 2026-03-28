@@ -1,4 +1,5 @@
 import notifee, { EventType } from '@notifee/react-native';
+import { Linking, Platform } from 'react-native';
 import { dismissAlarm, scheduleSnooze } from './src/services/alarmScheduler';
 import { scheduleNextDayAlarm } from './src/services/nextDayScheduler';
 import { updatePersistentNotification } from './src/services/persistentNotificationService';
@@ -61,13 +62,33 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 // Register foreground service — plays alarm sound continuously on Android
 // when the alarm notification fires. Runs until stopForegroundService() is called.
 notifee.registerForegroundService((notification) => {
-  return new Promise<void>(() => {
+  return new Promise<void>((resolve) => {
     const alarmId = notification?.data?.alarmId as string | undefined;
     console.log('[ForegroundService] Started — alarmId:', alarmId);
     if (alarmId) {
       mmkv.set('pending-alarm-id', alarmId);
     }
-    playAlarmSound();
+    playAlarmSound().catch((error) => {
+      console.error('[ForegroundService] Failed to play alarm sound:', error);
+    });
+
+    // Directly launch the app to foreground over lock screen.
+    // This bypasses MIUI/OEM ROMs that block Android's fullScreenIntent API.
+    // Uses the app's deep link scheme to call startActivity() directly.
+    if (Platform.OS === 'android') {
+      setTimeout(() => {
+        Linking.openURL('lumora://alarm-trigger').catch((err) => {
+          console.warn('[ForegroundService] Failed to launch app:', err);
+        });
+      }, 800);
+    }
+
+    // Auto-cleanup after 5 minutes to prevent zombie foreground services
+    setTimeout(() => {
+      console.log('[ForegroundService] Auto-cleanup after timeout');
+      stopAlarmSound().catch(() => {});
+      resolve();
+    }, 5 * 60 * 1000);
   });
 });
 

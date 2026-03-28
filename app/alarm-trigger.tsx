@@ -6,8 +6,9 @@ import {
   Dimensions,
   StyleSheet,
   Platform,
+  BackHandler,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -21,6 +22,7 @@ import Animated, {
   Easing,
   interpolateColor,
 } from 'react-native-reanimated';
+import notifee from '@notifee/react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useAlarmStore } from '../src/stores/alarmStore';
 import { playAlarmSound, stopAlarmSound } from '../src/services/soundService';
@@ -33,7 +35,6 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DISMISS_THRESHOLD = -150;
 
 export default function AlarmTriggerScreen() {
-  const router = useRouter();
   const { alarmId } = useLocalSearchParams<{ alarmId: string }>();
   const alarm = useAlarmStore((s) => (alarmId ? s.alarms[alarmId] : null));
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -50,18 +51,28 @@ export default function AlarmTriggerScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Start alarm sound and keep screen awake
-  // On Android, the foreground service already plays sound — only play on iOS
+  // Start alarm sound, keep screen awake, and hide the notification badge
   useEffect(() => {
     activateKeepAwakeAsync('alarm-trigger');
-    if (Platform.OS === 'ios') {
-      playAlarmSound();
+
+    async function setup() {
+      if (Platform.OS === 'android' && alarmId) {
+        // Stop the foreground service and cancel the alarm notification badge.
+        // The alarm-trigger screen is now showing, so we play sound directly.
+        try { await notifee.stopForegroundService(); } catch {}
+        try { await notifee.cancelNotification(alarmId); } catch {}
+        try { await notifee.cancelNotification(`${alarmId}-snooze`); } catch {}
+      }
+      // Play sound directly in the screen on all platforms
+      await playAlarmSound();
     }
+    setup();
+
     return () => {
       stopAlarmSound();
       deactivateKeepAwake('alarm-trigger');
     };
-  }, []);
+  }, [alarmId]);
 
   // Animations
   useEffect(() => {
@@ -109,24 +120,16 @@ export default function AlarmTriggerScreen() {
       await dismissAlarm(alarmId);
       await scheduleNextDayAlarm(alarmId);
     }
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/');
-    }
-  }, [alarmId, router]);
+    BackHandler.exitApp();
+  }, [alarmId]);
 
   const handleSnooze = useCallback(async () => {
     await stopAlarmSound();
     if (alarm) {
       await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
     }
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/');
-    }
-  }, [alarm, router]);
+    BackHandler.exitApp();
+  }, [alarm]);
 
   // Swipe up to dismiss
   const panGesture = Gesture.Pan()

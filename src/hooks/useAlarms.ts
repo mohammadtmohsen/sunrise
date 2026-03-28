@@ -52,9 +52,9 @@ export function useAlarms(sunTimes: SunTimes | null) {
       if (alarm.isEnabled) {
         // Was just enabled — schedule it
         // Absolute alarms don't need sunTimes, relative ones do
-        const notificationId = await scheduleAlarm(alarm, sunTimes);
-        if (notificationId) {
-          updateAlarm(id, { notificationId });
+        const result = await scheduleAlarm(alarm, sunTimes);
+        if (result.success) {
+          updateAlarm(id, { notificationId: result.notificationId });
         }
       } else {
         // Was just disabled — cancel it
