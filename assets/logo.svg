@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="arc" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff6b35" stop-opacity="0.2"/>
+      <stop offset="50%" stop-color="#f5a623" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#c44569" stop-opacity="0.2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="60%" stop-color="#f5a623" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#f5a623" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sunFill" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f5a623"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Horizon line -->
+  <line x1="96" y1="296" x2="416" y2="296" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+
+  <!-- Sun arc curve -->
+  <path d="M96,296 C160,80 352,80 416,296" fill="none" stroke="url(#arc)" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Sun glow -->
+  <circle cx="256" cy="148" r="48" fill="url(#glow)"/>
+
+  <!-- Sun circle -->
+  <circle cx="256" cy="148" r="22" fill="url(#sunFill)"/>
+</svg>
