@@ -9,6 +9,7 @@ import { useAlarmStore } from '../src/stores/alarmStore';
 import { mmkv } from '../src/stores/storage';
 import {
   setupNotificationChannel,
+  setupReminderNotificationChannel,
   setupStatusNotificationChannel,
   requestNotificationPermission,
   setupIOSCategories,
@@ -40,8 +41,11 @@ export default function RootLayout() {
 
   useEffect(() => {
     async function init() {
+      // Safety: stop any orphaned sound/vibration from a previous session
+      await stopAlarmSound();
       await requestNotificationPermission();
       await setupNotificationChannel();
+      await setupReminderNotificationChannel();
       await setupStatusNotificationChannel();
       await setupIOSCategories();
       await registerBackgroundRecalculation();
@@ -65,21 +69,25 @@ export default function RootLayout() {
         isAlarm,
       );
 
+      // Check if this is a reminder (should not launch full-screen)
+      const alarm = alarmId ? useAlarmStore.getState().alarms[alarmId] : null;
+      const isReminder = alarm?.alarmStyle === 'reminder';
+
       switch (type) {
         case EventType.DELIVERED:
-          if (isAlarm && alarmId) {
-            console.log(
-              '[ForegroundEvent] DELIVERED — navigating to alarm-trigger',
-            );
-            router.push({ pathname: '/alarm-trigger', params: { alarmId } });
-          }
+          // Full alarms are handled by the foreground service (stores pending-alarm-id + deep link)
+          // No action needed here to avoid double trigger
           break;
         case EventType.PRESS:
-          if (isAlarm && alarmId) {
+          if (isAlarm && alarmId && !isReminder) {
             console.log(
               '[ForegroundEvent] PRESS — navigating to alarm-trigger',
             );
             router.push({ pathname: '/alarm-trigger', params: { alarmId } });
+          }
+          if (isAlarm && alarmId && isReminder) {
+            // Reminder tapped — schedule next day
+            scheduleNextDayAlarm(alarmId);
           }
           break;
         case EventType.ACTION_PRESS:
@@ -98,6 +106,12 @@ export default function RootLayout() {
             updatePersistentNotification();
           }
           break;
+        case EventType.DISMISSED:
+          // When reminder notification is swiped away, schedule next day
+          if (isAlarm && alarmId && isReminder) {
+            scheduleNextDayAlarm(alarmId);
+          }
+          break;
       }
     });
 
@@ -112,6 +126,16 @@ export default function RootLayout() {
       if (pendingAlarmId) {
         console.log('[PendingAlarm] Found pending alarm:', pendingAlarmId);
         mmkv.delete('pending-alarm-id');
+
+        // Don't launch full-screen for reminders
+        const pendingAlarm = useAlarmStore.getState().alarms[pendingAlarmId];
+        if (pendingAlarm?.alarmStyle === 'reminder') {
+          console.log('[PendingAlarm] Reminder — skipping alarm-trigger');
+          stopAlarmSound();
+          scheduleNextDayAlarm(pendingAlarmId);
+          return true;
+        }
+
         router.push({
           pathname: '/alarm-trigger',
           params: { alarmId: pendingAlarmId },

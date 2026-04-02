@@ -16,7 +16,7 @@ import {
   formatTime24,
   formatOffset,
 } from '../utils/timeUtils';
-import { ALARM_CHANNEL_ID } from '../utils/constants';
+import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID } from '../utils/constants';
 
 /**
  * Ensure Android exact alarm permission is granted.
@@ -227,6 +227,8 @@ export async function scheduleAlarm(
 
   const body = getAlarmBody(alarm, triggerTime);
 
+  const isReminder = alarm.alarmStyle === 'reminder';
+
   try {
     const notificationId = await notifee.createTriggerNotification(
       {
@@ -238,55 +240,84 @@ export async function scheduleAlarm(
           alarmName: alarm.name,
           type: 'alarm-trigger',
         },
-        android: {
-          channelId: ALARM_CHANNEL_ID,
-          category: AndroidCategory.ALARM,
-          importance: AndroidImportance.HIGH,
-          visibility: AndroidVisibility.PUBLIC,
-          sound: 'default',
-          vibrationPattern: [500, 200, 500, 200],
-          lightUpScreen: true,
-          autoCancel: false,
-          ongoing: true,
-          asForegroundService: true,
-          fullScreenAction: {
-            id: 'default',
-            launchActivity: 'default',
-            launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
-          },
-          pressAction: {
-            id: 'default',
-            launchActivity: 'default',
-            launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
-          },
-          actions: [
-            {
-              title: 'Dismiss',
-              pressAction: { id: 'dismiss' },
+        android: isReminder
+          ? {
+              channelId: REMINDER_CHANNEL_ID,
+              importance: AndroidImportance.HIGH,
+              visibility: AndroidVisibility.PUBLIC,
+              sound: 'default',
+              vibrationPattern: [100, 200],
+              lightUpScreen: true,
+              autoCancel: true,
+              ongoing: false,
+              asForegroundService: false,
+              pressAction: { id: 'default' },
+              style: {
+                type: AndroidStyle.BIGTEXT,
+                text: `${alarm.name}\n${body}`,
+              },
+            }
+          : {
+              channelId: ALARM_CHANNEL_ID,
+              category: AndroidCategory.ALARM,
+              importance: AndroidImportance.HIGH,
+              visibility: AndroidVisibility.PUBLIC,
+              sound: 'default',
+              vibrationPattern: [500, 200, 500, 200],
+              lightUpScreen: true,
+              autoCancel: false,
+              ongoing: true,
+              badgeCount: 0,
+              asForegroundService: true,
+              fullScreenAction: {
+                id: 'default',
+                launchActivity: 'default',
+                launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
+              },
+              pressAction: {
+                id: 'default',
+                launchActivity: 'default',
+                launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
+              },
+              actions: [
+                {
+                  title: 'Dismiss',
+                  pressAction: { id: 'dismiss' },
+                },
+                {
+                  title: 'Snooze',
+                  pressAction: { id: 'snooze' },
+                },
+              ],
+              style: {
+                type: AndroidStyle.BIGTEXT,
+                text: `${alarm.name}\n${body}`,
+              },
             },
-            {
-              title: 'Snooze',
-              pressAction: { id: 'snooze' },
+        ios: isReminder
+          ? {
+              sound: 'default',
+              interruptionLevel: 'timeSensitive',
+              foregroundPresentationOptions: {
+                banner: true,
+                sound: true,
+                badge: true,
+                list: true,
+              },
+            }
+          : {
+              critical: true,
+              criticalVolume: 1.0,
+              sound: 'alarm-default.caf',
+              interruptionLevel: 'timeSensitive',
+              categoryId: 'alarm-actions',
+              foregroundPresentationOptions: {
+                banner: true,
+                sound: true,
+                badge: false,
+                list: true,
+              },
             },
-          ],
-          style: {
-            type: AndroidStyle.BIGTEXT,
-            text: `${alarm.name}\n${body}`,
-          },
-        },
-        ios: {
-          critical: true,
-          criticalVolume: 1.0,
-          sound: 'alarm-default.caf',
-          interruptionLevel: 'timeSensitive',
-          categoryId: 'alarm-actions',
-          foregroundPresentationOptions: {
-            banner: true,
-            sound: true,
-            badge: false,
-            list: true,
-          },
-        },
       },
       {
         type: TriggerType.TIMESTAMP,

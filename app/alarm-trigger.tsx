@@ -8,7 +8,7 @@ import {
   Platform,
   BackHandler,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -60,6 +60,7 @@ function buildArc(w: number, _h: number, horizonY: number): string {
 }
 
 export default function AlarmTriggerScreen() {
+  const router = useRouter();
   const { alarmId } = useLocalSearchParams<{ alarmId: string }>();
   const alarm = useAlarmStore((s) => (alarmId ? s.alarms[alarmId] : null));
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -77,10 +78,14 @@ export default function AlarmTriggerScreen() {
 
     async function setup() {
       if (Platform.OS === 'android' && alarmId) {
+        // Stop foreground service first — this kills the service's sound/vibration
         try { await notifee.stopForegroundService(); } catch {}
         try { await notifee.cancelNotification(alarmId); } catch {}
         try { await notifee.cancelNotification(`${alarmId}-snooze`); } catch {}
       }
+      // Stop any existing sound (from foreground service's JS context leaking)
+      await stopAlarmSound();
+      // Play sound fresh in this screen's context
       await playAlarmSound();
     }
     setup();
@@ -104,21 +109,30 @@ export default function AlarmTriggerScreen() {
   }, []);
 
   const handleDismiss = useCallback(async () => {
+    // Stop everything — foreground service, sound, vibration
+    try { await notifee.stopForegroundService(); } catch {}
     await stopAlarmSound();
     if (alarmId) {
       await dismissAlarm(alarmId);
       await scheduleNextDayAlarm(alarmId);
     }
-    BackHandler.exitApp();
-  }, [alarmId]);
+    if (router.canGoBack()) {
+      router.back();
+    }
+    setTimeout(() => BackHandler.exitApp(), 300);
+  }, [alarmId, router]);
 
   const handleSnooze = useCallback(async () => {
+    try { await notifee.stopForegroundService(); } catch {}
     await stopAlarmSound();
     if (alarm) {
       await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
     }
-    BackHandler.exitApp();
-  }, [alarm]);
+    if (router.canGoBack()) {
+      router.back();
+    }
+    setTimeout(() => BackHandler.exitApp(), 300);
+  }, [alarm, router]);
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {

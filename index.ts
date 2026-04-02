@@ -20,19 +20,29 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   const alarmId = detail.notification?.data?.alarmId as string | undefined;
   if (!alarmId) return;
 
+  const alarm = useAlarmStore.getState().alarms[alarmId];
+  const isReminder = alarm?.alarmStyle === 'reminder';
+
   switch (type) {
     case EventType.DELIVERED:
-      // Alarm just fired in background — store for when app opens
-      console.log(
-        '[BackgroundEvent] DELIVERED — storing pending alarm:',
-        alarmId,
-      );
-      mmkv.set('pending-alarm-id', alarmId);
+      if (isReminder) {
+        // Reminder — don't store pending alarm, just let notification stay visible
+        console.log('[BackgroundEvent] DELIVERED reminder — no action');
+      } else {
+        // Full alarm — store for when app opens
+        console.log('[BackgroundEvent] DELIVERED — storing pending alarm:', alarmId);
+        mmkv.set('pending-alarm-id', alarmId);
+      }
       break;
     case EventType.PRESS:
-      // User tapped notification — store for when app opens
-      console.log('[BackgroundEvent] PRESS — storing pending alarm:', alarmId);
-      mmkv.set('pending-alarm-id', alarmId);
+      if (isReminder) {
+        // Reminder tapped — schedule next day
+        await scheduleNextDayAlarm(alarmId);
+      } else {
+        // Full alarm tapped — store for when app opens
+        console.log('[BackgroundEvent] PRESS — storing pending alarm:', alarmId);
+        mmkv.set('pending-alarm-id', alarmId);
+      }
       break;
     case EventType.ACTION_PRESS:
       if (detail.pressAction?.id === 'dismiss') {
@@ -42,7 +52,6 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
         await updatePersistentNotification();
       } else if (detail.pressAction?.id === 'snooze') {
         await stopAlarmSound();
-        const alarm = useAlarmStore.getState().alarms[alarmId];
         if (alarm) {
           await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
           await dismissAlarm(alarmId);
@@ -51,10 +60,15 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
       }
       break;
     case EventType.DISMISSED:
-      await stopAlarmSound();
-      await dismissAlarm(alarmId);
-      await scheduleNextDayAlarm(alarmId);
-      await updatePersistentNotification();
+      if (isReminder) {
+        // Reminder swiped away — schedule next day
+        await scheduleNextDayAlarm(alarmId);
+      } else {
+        await stopAlarmSound();
+        await dismissAlarm(alarmId);
+        await scheduleNextDayAlarm(alarmId);
+        await updatePersistentNotification();
+      }
       break;
   }
 });
@@ -65,9 +79,21 @@ notifee.registerForegroundService((notification) => {
   return new Promise<void>((resolve) => {
     const alarmId = notification?.data?.alarmId as string | undefined;
     console.log('[ForegroundService] Started — alarmId:', alarmId);
+
+    // Reminders should never reach the foreground service, but if they do, exit immediately
+    const alarm = alarmId ? useAlarmStore.getState().alarms[alarmId] : null;
+    if (alarm?.alarmStyle === 'reminder') {
+      console.log('[ForegroundService] Reminder — exiting immediately');
+      resolve();
+      return;
+    }
+
     if (alarmId) {
       mmkv.set('pending-alarm-id', alarmId);
     }
+    // Update persistent notification immediately so it shows next alarm, not the one that just fired
+    updatePersistentNotification().catch(() => {});
+
     playAlarmSound().catch((error) => {
       console.error('[ForegroundService] Failed to play alarm sound:', error);
     });

@@ -5,7 +5,7 @@ import notifee, {
   IOSNotificationSetting,
 } from '@notifee/react-native';
 import { Platform, Linking } from 'react-native';
-import { ALARM_CHANNEL_ID, STATUS_CHANNEL_ID } from '../utils/constants';
+import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID, STATUS_CHANNEL_ID } from '../utils/constants';
 
 /**
  * Set up the Android notification channel for alarms.
@@ -18,6 +18,25 @@ export async function setupNotificationChannel(): Promise<void> {
     id: ALARM_CHANNEL_ID,
     name: 'Alarms',
     description: 'Sunrise and sunset alarm notifications',
+    importance: AndroidImportance.HIGH,
+    visibility: AndroidVisibility.PUBLIC,
+    sound: 'default',
+    vibration: true,
+    bypassDnd: true,
+  });
+}
+
+/**
+ * Set up the Android notification channel for reminders.
+ * High importance but no foreground service — just a notification with sound.
+ */
+export async function setupReminderNotificationChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  await notifee.createChannel({
+    id: REMINDER_CHANNEL_ID,
+    name: 'Reminders',
+    description: 'Simple reminder notifications',
     importance: AndroidImportance.HIGH,
     visibility: AndroidVisibility.PUBLIC,
     sound: 'default',

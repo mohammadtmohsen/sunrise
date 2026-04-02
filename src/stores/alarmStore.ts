@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import dayjs from 'dayjs';
 import { zustandMMKVStorage } from './storage';
-import type { Alarm, AlarmType, SunTimes } from '../models/types';
+import type { Alarm, AlarmType, AlarmStyle, SunTimes } from '../models/types';
 import { computeTriggerTime, computeAbsoluteTriggerTime } from '../utils/timeUtils';
 import { DEFAULT_SNOOZE_MINUTES } from '../utils/constants';
 
@@ -16,6 +16,7 @@ interface AddAlarmParams {
   absoluteHour?: number;
   absoluteMinute?: number;
   // Optional
+  alarmStyle?: AlarmStyle;
   soundUri?: string | null;
   vibrate?: boolean;
 }
@@ -47,6 +48,7 @@ export const useAlarmStore = create<AlarmState>()(
           offsetMinutes: params.offsetMinutes ?? 0,
           absoluteHour: params.absoluteHour ?? 6,
           absoluteMinute: params.absoluteMinute ?? 0,
+          alarmStyle: params.alarmStyle ?? 'alarm',
           isEnabled: true,
           soundUri: params.soundUri ?? null,
           vibrate: params.vibrate ?? true,

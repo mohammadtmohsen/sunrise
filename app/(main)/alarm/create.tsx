@@ -13,7 +13,7 @@ import { scheduleAlarm, type ScheduleFailure } from '../../../src/services/alarm
 import { updatePersistentNotification } from '../../../src/services/persistentNotificationService';
 import { formatTime, computeTriggerTime, computeAbsoluteTriggerTime } from '../../../src/utils/timeUtils';
 import { COLORS } from '../../../src/utils/constants';
-import type { AlarmType, AlarmMode } from '../../../src/models/types';
+import type { AlarmType, AlarmMode, AlarmStyle } from '../../../src/models/types';
 
 export default function CreateAlarmScreen() {
   const router = useRouter();
@@ -22,6 +22,7 @@ export default function CreateAlarmScreen() {
   const { todaySunTimes } = useSunTimes(location);
 
   const [name, setName] = useState('');
+  const [alarmStyle, setAlarmStyle] = useState<AlarmStyle>('alarm');
   const [alarmType, setAlarmType] = useState<AlarmType>('relative');
 
   // Relative fields
@@ -79,6 +80,7 @@ export default function CreateAlarmScreen() {
       offsetMinutes,
       absoluteHour,
       absoluteMinute,
+      alarmStyle,
     });
 
     // Compute nextTriggerAt immediately so persistent notification can show it
@@ -149,6 +151,33 @@ export default function CreateAlarmScreen() {
           marginBottom: 16,
         }}
       />
+
+      {/* Alarm style toggle */}
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+        {(['alarm', 'reminder'] as const).map((style) => (
+          <Pressable
+            key={style}
+            onPress={() => { Haptics.selectionAsync(); setAlarmStyle(style); }}
+            style={{
+              flex: 1,
+              paddingVertical: 12,
+              borderRadius: 12,
+              backgroundColor: alarmStyle === style
+                ? (style === 'alarm' ? COLORS.primary : COLORS.accent)
+                : COLORS.surface,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{
+              color: alarmStyle === style ? '#ffffff' : COLORS.textMuted,
+              fontSize: 15,
+              fontWeight: alarmStyle === style ? '700' : '400',
+            }}>
+              {style === 'alarm' ? 'Alarm' : 'Reminder'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
       {/* Sun times display with interactive mode selector */}
       <SunTimesDisplay

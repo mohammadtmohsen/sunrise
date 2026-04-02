@@ -1,5 +1,6 @@
 export type AlarmType = 'relative' | 'absolute';
 export type AlarmMode = 'before-sunrise' | 'after-sunrise' | 'before-sunset' | 'after-sunset' | 'fixed';
+export type AlarmStyle = 'alarm' | 'reminder';
 
 export interface Alarm {
   id: string;
@@ -14,6 +15,7 @@ export interface Alarm {
   absoluteHour: number; // 0-23
   absoluteMinute: number; // 0-59
 
+  alarmStyle: AlarmStyle;
   isEnabled: boolean;
   soundUri: string | null;
   vibrate: boolean;

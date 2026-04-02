@@ -17,5 +17,6 @@ export const COLORS = {
 } as const;
 
 export const ALARM_CHANNEL_ID = 'alarm-channel';
+export const REMINDER_CHANNEL_ID = 'reminder-channel';
 export const STATUS_CHANNEL_ID = 'status-channel';
 export const STATUS_NOTIFICATION_ID = 'persistent-status';
