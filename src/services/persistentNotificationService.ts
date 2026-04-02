@@ -8,7 +8,7 @@ import { useLocationStore } from '../stores/locationStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getSunTimes, isSunTimesValid } from './sunCalcService';
 import { STATUS_CHANNEL_ID, STATUS_NOTIFICATION_ID } from '../utils/constants';
-import { formatTime, formatTimeUntil } from '../utils/timeUtils';
+import { formatTime } from '../utils/timeUtils';
 import type { Alarm, SunTimes } from '../models/types';
 
 /**
@@ -32,8 +32,23 @@ function getNextAlarm(alarms: Record<string, Alarm>): Alarm | null {
 }
 
 /**
+ * Build the sun times line: "Sunrise 06:23  ·  Sunset 19:45"
+ */
+function buildSunLine(sunTimes: SunTimes): string {
+  return `Sunrise ${formatTime(sunTimes.sunrise)}  ·  Sunset ${formatTime(sunTimes.sunset)}`;
+}
+
+/**
  * Update or create the persistent status notification.
- * Shows sunrise time and next alarm with a native countdown timer.
+ *
+ * Collapsed view:
+ *   Title:  "Wake up lumors · 05:53"     (alarm name + trigger time)
+ *   Body:   "Sunrise 06:23 · Sunset 19:45"
+ *   Right:  native countdown timer (live, ticking)
+ *
+ * Expanded view:
+ *   "Sunrise: 06:23  ·  Sunset: 19:45
+ *    Wake up lumors at 05:53"
  *
  * Should be called whenever alarms, sun times, or settings change.
  * No-op on iOS (iOS does not support ongoing notifications).
@@ -52,7 +67,7 @@ export async function updatePersistentNotification(): Promise<void> {
     const alarms = useAlarmStore.getState().alarms;
     const nextAlarm = getNextAlarm(alarms);
 
-    // Compute sun times
+    // Compute fresh sun times
     let sunTimes: SunTimes | null = null;
     if (location) {
       const computed = getSunTimes(location.latitude, location.longitude);
@@ -61,27 +76,28 @@ export async function updatePersistentNotification(): Promise<void> {
       }
     }
 
-    // Build notification content
-    const sunriseText = sunTimes
-      ? `Sunrise ${formatTime(sunTimes.sunrise)}`
-      : null;
-
     let title: string;
     let body: string;
     let showChronometer = false;
     let timestamp: number | undefined;
 
     if (nextAlarm && nextAlarm.nextTriggerAt) {
-      const triggerAt = new Date(nextAlarm.nextTriggerAt).getTime();
-      title = `Next: ${nextAlarm.name}`;
-      const parts: string[] = [];
-      if (sunriseText) parts.push(sunriseText);
-      parts.push(formatTimeUntil(new Date(nextAlarm.nextTriggerAt)));
-      body = parts.join(' \u2022 ');
+      const triggerDate = new Date(nextAlarm.nextTriggerAt);
+      const triggerAt = triggerDate.getTime();
+
+      // Title: alarm name + exact trigger time
+      title = `${nextAlarm.name}  ·  ${formatTime(triggerDate)}`;
+
+      // Body: sunrise + sunset
+      body = sunTimes
+        ? buildSunLine(sunTimes)
+        : 'Location not set';
+
       showChronometer = true;
       timestamp = triggerAt;
     } else {
-      title = sunriseText ?? 'Lumora';
+      // No active alarms — show sun times as title
+      title = sunTimes ? buildSunLine(sunTimes) : 'Lumora';
       body = 'No active alarms';
     }
 
@@ -125,15 +141,13 @@ function buildExpandedText(
 
   if (sunTimes) {
     lines.push(
-      `Sunrise: ${formatTime(sunTimes.sunrise)}  \u2022  Sunset: ${formatTime(sunTimes.sunset)}`,
+      `Sunrise: ${formatTime(sunTimes.sunrise)}  ·  Sunset: ${formatTime(sunTimes.sunset)}`,
     );
   }
 
   if (nextAlarm && nextAlarm.nextTriggerAt) {
     const triggerDate = new Date(nextAlarm.nextTriggerAt);
-    lines.push(
-      `Next alarm: ${nextAlarm.name} at ${formatTime(triggerDate)}`,
-    );
+    lines.push(`${nextAlarm.name} at ${formatTime(triggerDate)}`);
   } else {
     lines.push('No active alarms');
   }

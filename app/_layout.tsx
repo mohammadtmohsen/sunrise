@@ -23,6 +23,7 @@ import { useAppStateRecalculation } from '../src/hooks/useAppStateRecalculation'
 import { useRescheduleOnResume } from '../src/hooks/useRescheduleOnResume';
 import { registerBackgroundRecalculation } from '../src/tasks/backgroundRecalculate';
 import { useSettingsStore } from '../src/stores/settingsStore';
+import { scheduleDailyMaintenance } from '../src/services/maintenanceScheduler';
 import { AppHeader } from '../src/components/AppHeader';
 import { COLORS } from '../src/utils/constants';
 
@@ -49,6 +50,7 @@ export default function RootLayout() {
       await setupStatusNotificationChannel();
       await setupIOSCategories();
       await registerBackgroundRecalculation();
+      await scheduleDailyMaintenance();
       useSettingsStore.getState().setOnboardingComplete();
       await updatePersistentNotification();
     }
@@ -86,7 +88,10 @@ export default function RootLayout() {
             router.push({ pathname: '/alarm-trigger', params: { alarmId } });
           }
           if (isAlarm && alarmId && isReminder) {
-            // Reminder tapped — schedule next day
+            // Reminder tapped — cancel notification and schedule next day
+            if (detail.notification?.id) {
+              notifee.cancelNotification(detail.notification.id);
+            }
             scheduleNextDayAlarm(alarmId);
           }
           break;

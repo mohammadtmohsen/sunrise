@@ -83,9 +83,14 @@ export default function SettingsScreen() {
     customSoundName,
     setCustomSound,
     clearCustomSound,
+    customReminderSoundUri,
+    customReminderSoundName,
+    setCustomReminderSound,
+    clearCustomReminderSound,
   } = useSettingsStore();
 
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isPreviewingReminder, setIsPreviewingReminder] = useState(false);
   const [notifPermission, setNotifPermission] = useState<boolean | null>(null);
   const [criticalAlerts, setCriticalAlerts] = useState<boolean | null>(null);
   const [batteryInfo, setBatteryInfo] = useState<{
@@ -158,6 +163,43 @@ export default function SettingsScreen() {
     await stopPreviewSound();
     setIsPreviewing(false);
   }, [customSoundUri, clearCustomSound]);
+
+  const handlePickReminderSound = useCallback(async () => {
+    try {
+      const result = await pickAudioFile();
+      if (result) {
+        if (customReminderSoundUri) {
+          await deleteCustomSound(customReminderSoundUri);
+        }
+        setCustomReminderSound(result.uri, result.name);
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to select audio file. Please try again.');
+    }
+  }, [customReminderSoundUri, setCustomReminderSound]);
+
+  const handlePreviewReminder = useCallback(async () => {
+    if (isPreviewingReminder) {
+      await stopPreviewSound();
+      setIsPreviewingReminder(false);
+    } else {
+      setIsPreviewingReminder(true);
+      await playPreviewSound(customReminderSoundUri);
+      setTimeout(async () => {
+        await stopPreviewSound();
+        setIsPreviewingReminder(false);
+      }, 10000);
+    }
+  }, [isPreviewingReminder, customReminderSoundUri]);
+
+  const handleResetReminderSound = useCallback(async () => {
+    if (customReminderSoundUri) {
+      await deleteCustomSound(customReminderSoundUri);
+    }
+    clearCustomReminderSound();
+    await stopPreviewSound();
+    setIsPreviewingReminder(false);
+  }, [customReminderSoundUri, clearCustomReminderSound]);
 
   useEffect(() => {
     return () => { stopPreviewSound(); };
@@ -378,6 +420,55 @@ export default function SettingsScreen() {
             {customSoundUri && (
               <Pressable
                 onPress={(e) => { e.stopPropagation(); handleResetSound(); }}
+                hitSlop={8}
+              >
+                <Text style={{ color: COLORS.danger, fontSize: 13, fontWeight: '600' }}>
+                  Reset
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        </Pressable>
+
+        {/* Reminder Sound */}
+        <Pressable
+          onPress={handlePickReminderSound}
+          style={{
+            backgroundColor: COLORS.surface,
+            padding: 16,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottomWidth: 1,
+            borderBottomColor: COLORS.border,
+          }}
+        >
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={{ color: COLORS.textPrimary, fontSize: 16 }}>
+              Reminder Sound
+            </Text>
+            <Text style={{ color: COLORS.textMuted, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+              {customReminderSoundName ?? 'Default'}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Pressable
+              onPress={(e) => { e.stopPropagation(); handlePreviewReminder(); }}
+              hitSlop={8}
+              style={{
+                paddingVertical: 4,
+                paddingHorizontal: 10,
+                borderRadius: 8,
+                backgroundColor: isPreviewingReminder ? COLORS.accent : 'rgba(255,255,255,0.06)',
+              }}
+            >
+              <Text style={{ color: isPreviewingReminder ? '#000000' : COLORS.accent, fontSize: 13, fontWeight: '600' }}>
+                {isPreviewingReminder ? 'Stop' : 'Play'}
+              </Text>
+            </Pressable>
+            {customReminderSoundUri && (
+              <Pressable
+                onPress={(e) => { e.stopPropagation(); handleResetReminderSound(); }}
                 hitSlop={8}
               >
                 <Text style={{ color: COLORS.danger, fontSize: 13, fontWeight: '600' }}>

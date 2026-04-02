@@ -1,3 +1,4 @@
+import * as DocumentPicker from 'expo-document-picker';
 import { File, Directory, Paths } from 'expo-file-system';
 
 const CUSTOM_SOUND_DIR_NAME = 'custom-sounds';
@@ -12,19 +13,15 @@ export interface PickResult {
 }
 
 export async function pickAudioFile(): Promise<PickResult | null> {
-  let result: File | File[] | null;
-  try {
-    result = await File.pickFileAsync(undefined, 'public.audio');
-  } catch {
-    // User cancelled the picker
-    return null;
-  }
-  if (!result) return null;
+  const result = await DocumentPicker.getDocumentAsync({
+    type: 'audio/*',
+    copyToCacheDirectory: true,
+  });
 
-  const pickedFile = Array.isArray(result) ? result[0] : result;
-  if (!pickedFile) return null;
+  if (result.canceled || !result.assets?.length) return null;
 
-  const originalName = pickedFile.name ?? 'Custom Sound';
+  const asset = result.assets[0];
+  const originalName = asset.name ?? 'Custom Sound';
 
   const dir = getCustomSoundDir();
   if (!dir.exists) {
@@ -33,8 +30,12 @@ export async function pickAudioFile(): Promise<PickResult | null> {
 
   cleanupOldCustomSound();
 
-  const destFile = new File(dir, `custom-alarm${pickedFile.extension || '.audio'}`);
-  pickedFile.copy(destFile);
+  const extension = originalName.includes('.')
+    ? `.${originalName.split('.').pop()}`
+    : '.audio';
+  const destFile = new File(dir, `custom-alarm${extension}`);
+  const sourceFile = new File(asset.uri);
+  sourceFile.copy(destFile);
 
   return { uri: destFile.uri, name: originalName };
 }

@@ -50,6 +50,7 @@
         }
       ],
       "./plugins/withAlarmPermissions",
+      "./plugins/withBootReceiver",
       "./plugins/withIOSAlarmPermissions",
       "./plugins/withMMKVFix"
     ],

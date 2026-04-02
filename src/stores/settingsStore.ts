@@ -10,12 +10,16 @@ interface SettingsState {
   showPersistentNotification: boolean;
   customSoundUri: string | null;
   customSoundName: string | null;
+  customReminderSoundUri: string | null;
+  customReminderSoundName: string | null;
   setDefaultSnoozeDuration: (minutes: number) => void;
   setDefaultVibrate: (vibrate: boolean) => void;
   setOnboardingComplete: () => void;
   setShowPersistentNotification: (show: boolean) => void;
   setCustomSound: (uri: string, name: string) => void;
   clearCustomSound: () => void;
+  setCustomReminderSound: (uri: string, name: string) => void;
+  clearCustomReminderSound: () => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -27,6 +31,8 @@ export const useSettingsStore = create<SettingsState>()(
       showPersistentNotification: false,
       customSoundUri: null,
       customSoundName: null,
+      customReminderSoundUri: null,
+      customReminderSoundName: null,
 
       setDefaultSnoozeDuration: (minutes) =>
         set({ defaultSnoozeDuration: minutes }),
@@ -38,6 +44,10 @@ export const useSettingsStore = create<SettingsState>()(
         set({ customSoundUri: uri, customSoundName: name }),
       clearCustomSound: () =>
         set({ customSoundUri: null, customSoundName: null }),
+      setCustomReminderSound: (uri, name) =>
+        set({ customReminderSoundUri: uri, customReminderSoundName: name }),
+      clearCustomReminderSound: () =>
+        set({ customReminderSoundUri: null, customReminderSoundName: null }),
     }),
     {
       name: 'settings-store',

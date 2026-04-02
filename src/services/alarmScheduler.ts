@@ -17,6 +17,7 @@ import {
   formatOffset,
 } from '../utils/timeUtils';
 import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID } from '../utils/constants';
+import { useSettingsStore } from '../stores/settingsStore';
 
 /**
  * Ensure Android exact alarm permission is granted.
@@ -228,6 +229,7 @@ export async function scheduleAlarm(
   const body = getAlarmBody(alarm, triggerTime);
 
   const isReminder = alarm.alarmStyle === 'reminder';
+  const hasCustomReminderSound = !!useSettingsStore.getState().customReminderSoundUri;
 
   try {
     const notificationId = await notifee.createTriggerNotification(
@@ -245,13 +247,19 @@ export async function scheduleAlarm(
               channelId: REMINDER_CHANNEL_ID,
               importance: AndroidImportance.HIGH,
               visibility: AndroidVisibility.PUBLIC,
-              sound: 'default',
+              sound: hasCustomReminderSound ? undefined : 'default',
               vibrationPattern: [100, 200],
               lightUpScreen: true,
-              autoCancel: true,
+              autoCancel: false,
               ongoing: false,
-              asForegroundService: false,
+              asForegroundService: hasCustomReminderSound,
               pressAction: { id: 'default' },
+              actions: [
+                {
+                  title: 'Dismiss',
+                  pressAction: { id: 'dismiss' },
+                },
+              ],
               style: {
                 type: AndroidStyle.BIGTEXT,
                 text: `${alarm.name}\n${body}`,
@@ -341,7 +349,7 @@ export async function scheduleAlarm(
  * Cancel a scheduled alarm notification and any active snooze.
  */
 export async function cancelAlarm(alarm: Alarm): Promise<void> {
-  const ids = [alarm.id, `${alarm.id}-snooze`];
+  const ids = [alarm.id, `${alarm.id}-snooze`, `${alarm.id}-persist`, `${alarm.id}-watch`];
   for (const id of ids) {
     try {
       await notifee.cancelNotification(id);
@@ -467,7 +475,7 @@ export async function scheduleSnooze(
  * Dismiss an active alarm — cancel notification + stop foreground service.
  */
 export async function dismissAlarm(alarmId: string): Promise<void> {
-  const ids = [alarmId, `${alarmId}-snooze`];
+  const ids = [alarmId, `${alarmId}-snooze`, `${alarmId}-persist`, `${alarmId}-watch`];
   for (const id of ids) {
     try {
       await notifee.cancelNotification(id);

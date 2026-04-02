@@ -43,6 +43,41 @@ export async function playAlarmSound(): Promise<void> {
   }
 }
 
+export async function playReminderSound(): Promise<void> {
+  if (currentPlayer) {
+    try {
+      currentPlayer.pause();
+      currentPlayer.release();
+    } catch {}
+    currentPlayer = null;
+  }
+
+  try {
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldRouteThroughEarpiece: false,
+    });
+
+    const { customReminderSoundUri } = useSettingsStore.getState();
+    const source = customReminderSoundUri
+      ? { uri: customReminderSoundUri }
+      : require('../../assets/sounds/alarm-default.wav');
+
+    const player = createAudioPlayer(source);
+    player.loop = false;
+    player.volume = 1.0;
+    player.play();
+
+    currentPlayer = player;
+
+    // Single vibration burst for reminders
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  } catch (error) {
+    console.warn('Failed to play reminder sound:', error);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }
+}
+
 export async function playPreviewSound(uri: string | null): Promise<void> {
   await stopPreviewSound();
 
