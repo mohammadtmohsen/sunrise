@@ -57,6 +57,16 @@ export default function RootLayout() {
     init();
   }, []);
 
+  // Periodically refresh the persistent notification every 60s while app is in foreground.
+  // This keeps relative times ("in 2h 14m") accurate, prevents the chronometer from
+  // going negative (by switching to the next alarm), and updates after alarm dismissals.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      updatePersistentNotification().catch(() => {});
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
       const alarmId = detail.notification?.data?.alarmId as string | undefined;

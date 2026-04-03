@@ -8,11 +8,29 @@ import { Platform, Linking } from 'react-native';
 import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID, STATUS_CHANNEL_ID } from '../utils/constants';
 
 /**
+ * Delete old channel versions that are now superseded.
+ * Android channels are immutable once created — sound/importance settings
+ * cannot be changed. We use versioned channel IDs and delete old ones.
+ */
+async function deleteOldChannels(): Promise<void> {
+  const oldChannels = [
+    'alarm-channel', 'alarm-channel-v1',
+    'reminder-channel', 'reminder-channel-v1',
+    'status-channel', 'status-channel-v1',
+  ];
+  for (const id of oldChannels) {
+    try { await notifee.deleteChannel(id); } catch { /* may not exist */ }
+  }
+}
+
+/**
  * Set up the Android notification channel for alarms.
  * Must be called before scheduling any notification.
  */
 export async function setupNotificationChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
+
+  await deleteOldChannels();
 
   await notifee.createChannel({
     id: ALARM_CHANNEL_ID,
@@ -28,7 +46,7 @@ export async function setupNotificationChannel(): Promise<void> {
 
 /**
  * Set up the Android notification channel for reminders.
- * High importance but no foreground service — just a notification with sound.
+ * High importance with sound enabled so reminders are audible.
  */
 export async function setupReminderNotificationChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;

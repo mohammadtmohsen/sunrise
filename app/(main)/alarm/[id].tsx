@@ -101,12 +101,13 @@ export default function EditAlarmScreen() {
       absoluteHour,
       absoluteMinute,
       alarmStyle,
+      isEnabled: true,
       nextTriggerAt: triggerTime?.toISOString() ?? null,
     });
 
-    // Reschedule
+    // Reschedule (alarm is now always enabled after save)
     const updated = useAlarmStore.getState().alarms[id!];
-    if (updated && updated.isEnabled) {
+    if (updated) {
       const result = await scheduleAlarm(updated, todaySunTimes);
       if (result.success) {
         updateAlarm(id!, { notificationId: result.notificationId });

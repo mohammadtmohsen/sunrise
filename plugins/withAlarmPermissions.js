@@ -24,6 +24,7 @@ function withAlarmPermissions(config) {
       'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
       'android.permission.RECEIVE_BOOT_COMPLETED',
       'android.permission.SCHEDULE_EXACT_ALARM',
+      'android.permission.USE_EXACT_ALARM',
       'android.permission.WAKE_LOCK',
     ];
 

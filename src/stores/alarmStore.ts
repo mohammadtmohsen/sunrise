@@ -131,9 +131,11 @@ export const useAlarmStore = create<AlarmState>()(
       },
 
       getAlarmsArray: () => {
-        return Object.values(get().alarms).sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        );
+        return Object.values(get().alarms).sort((a, b) => {
+          const aTime = a.nextTriggerAt ? new Date(a.nextTriggerAt).getTime() : Infinity;
+          const bTime = b.nextTriggerAt ? new Date(b.nextTriggerAt).getTime() : Infinity;
+          return aTime - bTime;
+        });
       },
 
       getEnabledAlarms: () => {

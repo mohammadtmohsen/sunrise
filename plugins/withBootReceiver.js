@@ -9,16 +9,26 @@ const BOOT_RECEIVER_KOTLIN = `package com.lumora.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import com.facebook.react.HeadlessJsTaskService
 
 class BootAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
+            intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED ||
             intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
             intent.action == "com.htc.intent.action.QUICKBOOT_POWERON"
         ) {
             try {
+                // Acquire wake lock before returning from onReceive to prevent
+                // the device from going back to sleep before the headless task runs
+                HeadlessJsTaskService.acquireWakeLockNow(context)
                 val serviceIntent = Intent(context, BootAlarmTaskService::class.java)
-                context.startService(serviceIntent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
             } catch (_: Exception) {
                 // Service start may fail on some OEMs
             }
@@ -95,12 +105,15 @@ function withBootReceiver(config) {
           'android:name': '.BootAlarmReceiver',
           'android:exported': 'true',
           'android:enabled': 'true',
+          'android:directBootAware': 'true',
         },
         'intent-filter': [
           {
             action: [
               { $: { 'android:name': 'android.intent.action.BOOT_COMPLETED' } },
+              { $: { 'android:name': 'android.intent.action.LOCKED_BOOT_COMPLETED' } },
               { $: { 'android:name': 'android.intent.action.QUICKBOOT_POWERON' } },
+              { $: { 'android:name': 'com.htc.intent.action.QUICKBOOT_POWERON' } },
             ],
           },
         ],

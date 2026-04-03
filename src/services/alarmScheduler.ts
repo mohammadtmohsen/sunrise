@@ -229,7 +229,6 @@ export async function scheduleAlarm(
   const body = getAlarmBody(alarm, triggerTime);
 
   const isReminder = alarm.alarmStyle === 'reminder';
-  const hasCustomReminderSound = !!useSettingsStore.getState().customReminderSoundUri;
 
   try {
     const notificationId = await notifee.createTriggerNotification(
@@ -247,12 +246,12 @@ export async function scheduleAlarm(
               channelId: REMINDER_CHANNEL_ID,
               importance: AndroidImportance.HIGH,
               visibility: AndroidVisibility.PUBLIC,
-              sound: hasCustomReminderSound ? undefined : 'default',
+              sound: 'default',
               vibrationPattern: [100, 200],
               lightUpScreen: true,
               autoCancel: false,
               ongoing: false,
-              asForegroundService: hasCustomReminderSound,
+              asForegroundService: true,
               pressAction: { id: 'default' },
               actions: [
                 {
