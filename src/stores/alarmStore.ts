@@ -2,8 +2,13 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import dayjs from 'dayjs';
 import { zustandMMKVStorage } from './storage';
-import type { Alarm, AlarmType, AlarmStyle, SunTimes } from '../models/types';
-import { computeTriggerTime, computeAbsoluteTriggerTime } from '../utils/timeUtils';
+import type { Alarm, AlarmType, AlarmStyle, RepeatMode, SunTimes } from '../models/types';
+import {
+  computeTriggerTime,
+  computeAbsoluteTriggerTime,
+  computeNextTriggerForDays,
+  computeNextRelativeTriggerForDays,
+} from '../utils/timeUtils';
 import { DEFAULT_SNOOZE_MINUTES } from '../utils/constants';
 
 interface AddAlarmParams {
@@ -17,6 +22,8 @@ interface AddAlarmParams {
   absoluteMinute?: number;
   // Optional
   alarmStyle?: AlarmStyle;
+  repeatMode?: RepeatMode;
+  repeatDays?: number[];
   soundUri?: string | null;
   vibrate?: boolean;
 }
@@ -49,6 +56,8 @@ export const useAlarmStore = create<AlarmState>()(
           absoluteHour: params.absoluteHour ?? 6,
           absoluteMinute: params.absoluteMinute ?? 0,
           alarmStyle: params.alarmStyle ?? 'alarm',
+          repeatMode: params.repeatMode ?? 'once',
+          repeatDays: params.repeatDays ?? [],
           isEnabled: true,
           soundUri: params.soundUri ?? null,
           vibrate: params.vibrate ?? true,
@@ -111,14 +120,22 @@ export const useAlarmStore = create<AlarmState>()(
           const updated = { ...state.alarms };
           for (const [id, alarm] of Object.entries(updated)) {
             let triggerTime: Date | null = null;
+            const hasDays = alarm.repeatDays && alarm.repeatDays.length > 0;
+
             if (alarm.type === 'absolute') {
-              triggerTime = computeAbsoluteTriggerTime(alarm.absoluteHour, alarm.absoluteMinute);
+              triggerTime = hasDays
+                ? computeNextTriggerForDays(alarm.absoluteHour, alarm.absoluteMinute, alarm.repeatDays)
+                : computeAbsoluteTriggerTime(alarm.absoluteHour, alarm.absoluteMinute);
             } else if (sunTimes) {
               const eventTime = sunTimes[alarm.referenceEvent];
-              triggerTime = computeTriggerTime(eventTime, alarm.offsetMinutes);
-              // If past, shift to tomorrow
-              if (triggerTime <= now) {
-                triggerTime = dayjs(triggerTime).add(1, 'day').toDate();
+              if (hasDays) {
+                triggerTime = computeNextRelativeTriggerForDays(eventTime, alarm.offsetMinutes, alarm.repeatDays);
+              } else {
+                triggerTime = computeTriggerTime(eventTime, alarm.offsetMinutes);
+                // If past, shift to tomorrow
+                if (triggerTime <= now) {
+                  triggerTime = dayjs(triggerTime).add(1, 'day').toDate();
+                }
               }
             }
             updated[id] = {

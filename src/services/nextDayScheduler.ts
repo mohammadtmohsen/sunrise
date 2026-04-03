@@ -15,6 +15,17 @@ export async function scheduleNextDayAlarm(alarmId: string): Promise<void> {
   const alarm = useAlarmStore.getState().alarms[alarmId];
   if (!alarm || !alarm.isEnabled) return;
 
+  // "Once" alarms auto-disable after firing — don't reschedule
+  if (alarm.repeatMode === 'once') {
+    useAlarmStore.getState().updateAlarm(alarmId, {
+      isEnabled: false,
+      nextTriggerAt: null,
+      notificationId: null,
+    });
+    await updatePersistentNotification();
+    return;
+  }
+
   if (alarm.type === 'absolute') {
     const result = await scheduleAlarm(alarm, null);
     if (result.success) {

@@ -10,7 +10,13 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import type { Alarm } from '../models/types';
-import { formatOffset, formatTime, formatTime24, formatTimeUntil } from '../utils/timeUtils';
+import {
+  formatOffset,
+  formatTime,
+  formatTime24,
+  formatTimeUntil,
+  formatRepeatDays,
+} from '../utils/timeUtils';
 import { SunriseIcon, SunsetIcon, AlarmIcon } from './Icons';
 import { COLORS } from '../utils/constants';
 
@@ -58,7 +64,7 @@ export function AnimatedToggle({
   return (
     <Pressable
       onPress={onValueChange}
-      accessibilityRole="switch"
+      accessibilityRole='switch'
       accessibilityState={{ checked: value }}
       accessibilityLabel={accessibilityLabel}
       hitSlop={8}
@@ -102,9 +108,21 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
   const maxSwipe = -(screenWidth - 32);
 
   const isAbsolute = alarm.type === 'absolute';
-  const eventLabel = isAbsolute ? 'Fixed time' : alarm.referenceEvent === 'sunrise' ? 'Sunrise' : 'Sunset';
-  const EventIconComponent = isAbsolute ? AlarmIcon : alarm.referenceEvent === 'sunrise' ? SunriseIcon : SunsetIcon;
-  const eventColor = isAbsolute ? COLORS.accent : alarm.referenceEvent === 'sunrise' ? COLORS.sunrise : COLORS.sunset;
+  const eventLabel = isAbsolute
+    ? 'Fixed time'
+    : alarm.referenceEvent === 'sunrise'
+      ? 'Sunrise'
+      : 'Sunset';
+  const EventIconComponent = isAbsolute
+    ? AlarmIcon
+    : alarm.referenceEvent === 'sunrise'
+      ? SunriseIcon
+      : SunsetIcon;
+  const eventColor = isAbsolute
+    ? COLORS.accent
+    : alarm.referenceEvent === 'sunrise'
+      ? COLORS.sunrise
+      : COLORS.sunset;
 
   const translateX = useSharedValue(0);
 
@@ -137,7 +155,14 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
   }));
 
   return (
-    <View style={{ marginHorizontal: 16, marginBottom: 10, borderRadius: 14, overflow: 'hidden' }}>
+    <View
+      style={{
+        marginHorizontal: 16,
+        marginBottom: 10,
+        borderRadius: 14,
+        overflow: 'hidden',
+      }}
+    >
       {/* Delete background — grows with swipe */}
       <Animated.View
         style={[
@@ -154,10 +179,44 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
           deleteStyle,
         ]}
       >
-        <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-          <View style={{ width: 18, height: 2, backgroundColor: '#ffffff', borderRadius: 1, position: 'absolute', top: 4 }} />
-          <View style={{ width: 14, height: 16, borderRadius: 2, borderWidth: 1.5, borderColor: '#ffffff', marginTop: 4 }} />
-          <View style={{ width: 8, height: 2, backgroundColor: '#ffffff', borderRadius: 1, position: 'absolute', top: 2 }} />
+        <View
+          style={{
+            width: 24,
+            height: 24,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <View
+            style={{
+              width: 18,
+              height: 2,
+              backgroundColor: '#ffffff',
+              borderRadius: 1,
+              position: 'absolute',
+              top: 4,
+            }}
+          />
+          <View
+            style={{
+              width: 14,
+              height: 16,
+              borderRadius: 2,
+              borderWidth: 1.5,
+              borderColor: '#ffffff',
+              marginTop: 4,
+            }}
+          />
+          <View
+            style={{
+              width: 8,
+              height: 2,
+              backgroundColor: '#ffffff',
+              borderRadius: 1,
+              position: 'absolute',
+              top: 2,
+            }}
+          />
         </View>
       </Animated.View>
 
@@ -173,16 +232,20 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
               flexDirection: 'row',
               alignItems: 'center',
             })}
-            accessibilityRole="button"
+            accessibilityRole='button'
             accessibilityLabel={`${alarm.name}, ${isAbsolute ? formatTime24(alarm.absoluteHour, alarm.absoluteMinute) : `${formatOffset(alarm.offsetMinutes)} ${eventLabel}`}, ${alarm.isEnabled ? 'enabled' : 'disabled'}${alarm.nextTriggerAt ? `, next at ${formatTime(new Date(alarm.nextTriggerAt))}` : ''}`}
-            accessibilityHint="Double tap to edit"
+            accessibilityHint='Double tap to edit'
           >
             {/* Column 1: Time + Icon */}
-            <View style={{ alignItems: 'center', marginRight: 14, minWidth: 56 }}>
+            <View
+              style={{ alignItems: 'center', marginRight: 14, minWidth: 56 }}
+            >
               {alarm.nextTriggerAt ? (
                 <Text
                   style={{
-                    color: alarm.isEnabled ? COLORS.textPrimary : COLORS.textMuted,
+                    color: alarm.isEnabled
+                      ? COLORS.textPrimary
+                      : COLORS.textMuted,
                     fontSize: 18,
                     fontWeight: '700',
                     marginBottom: 6,
@@ -191,55 +254,177 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
                   {formatTime(new Date(alarm.nextTriggerAt))}
                 </Text>
               ) : (
-                <Text style={{ color: COLORS.textMuted, fontSize: 14, marginBottom: 6 }}>--:--</Text>
+                <Text
+                  style={{
+                    color: COLORS.textMuted,
+                    fontSize: 14,
+                    marginBottom: 6,
+                  }}
+                >
+                  --:--
+                </Text>
               )}
-              <View accessibilityElementsHidden style={{ opacity: alarm.isEnabled ? 1 : 0.3 }}>
-                <EventIconComponent size={22} />
+              <View
+                accessibilityElementsHidden
+                style={{
+                  opacity: alarm.isEnabled ? 1 : 0.3,
+                  position: 'relative',
+                }}
+              >
+                <EventIconComponent size={30} />
+                <Text
+                  style={{
+                    position: 'absolute',
+                    bottom: 2,
+                    right: -6,
+                    color:
+                      (alarm.repeatMode ?? 'once') === 'repeat'
+                        ? COLORS.success
+                        : COLORS.textSecondary,
+                    fontSize: 12,
+                    fontWeight: '900',
+                  }}
+                >
+                  {(alarm.repeatMode ?? 'once') === 'repeat'
+                    ? '\u221E'
+                    : '\u2460'}
+                </Text>
               </View>
             </View>
 
             {/* Column 2: Details */}
             <View style={{ flex: 1 }}>
-              <Text
+              <View
                 style={{
-                  color: alarm.isEnabled ? COLORS.textPrimary : COLORS.textMuted,
-                  fontSize: 17,
-                  fontWeight: '600',
+                  flexDirection: 'row',
+                  alignItems: 'center',
                   marginBottom: 3,
+                  gap: 6,
                 }}
-                numberOfLines={1}
               >
-                {alarm.name}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3, gap: 6 }}>
-                <Text style={{ color: alarm.isEnabled ? eventColor : COLORS.textMuted, fontSize: 13 }}>
-                  {isAbsolute
-                    ? `Daily at ${formatTime24(alarm.absoluteHour, alarm.absoluteMinute)}`
-                    : `${formatOffset(alarm.offsetMinutes)} ${eventLabel.toLowerCase()}`}
+                <Text
+                  style={{
+                    color: alarm.isEnabled
+                      ? COLORS.textPrimary
+                      : COLORS.textMuted,
+                    fontSize: 17,
+                    fontWeight: '600',
+                    flexShrink: 1,
+                  }}
+                  numberOfLines={1}
+                >
+                  {alarm.name}
                 </Text>
-                <View style={{
-                  width: 16, height: 16,
-                  alignItems: 'center', justifyContent: 'center',
-                  opacity: alarm.isEnabled ? 0.7 : 0.3,
-                }}>
+                <View
+                  style={{
+                    width: 16,
+                    height: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: alarm.isEnabled ? 0.7 : 0.3,
+                  }}
+                >
                   {alarm.alarmStyle === 'reminder' ? (
-                    // Bell icon
                     <>
-                      <View style={{ width: 10, height: 8, borderTopLeftRadius: 5, borderTopRightRadius: 5, backgroundColor: COLORS.accent }} />
-                      <View style={{ width: 14, height: 1.5, backgroundColor: COLORS.accent, marginTop: 0.5, borderRadius: 1 }} />
-                      <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: COLORS.accent, marginTop: 0.5 }} />
+                      <View
+                        style={{
+                          width: 10,
+                          height: 8,
+                          borderTopLeftRadius: 5,
+                          borderTopRightRadius: 5,
+                          backgroundColor: COLORS.accent,
+                        }}
+                      />
+                      <View
+                        style={{
+                          width: 14,
+                          height: 1.5,
+                          backgroundColor: COLORS.accent,
+                          marginTop: 0.5,
+                          borderRadius: 1,
+                        }}
+                      />
+                      <View
+                        style={{
+                          width: 3,
+                          height: 3,
+                          borderRadius: 1.5,
+                          backgroundColor: COLORS.accent,
+                          marginTop: 0.5,
+                        }}
+                      />
                     </>
                   ) : (
-                    // Alarm clock icon
                     <>
-                      <View style={{ width: 11, height: 11, borderRadius: 5.5, borderWidth: 1.5, borderColor: COLORS.primary }} />
-                      <View style={{ position: 'absolute', top: 3, width: 1.5, height: 4, backgroundColor: COLORS.primary }} />
-                      <View style={{ position: 'absolute', top: 5, left: 7.5, width: 3, height: 1.5, backgroundColor: COLORS.primary }} />
+                      <View
+                        style={{
+                          width: 11,
+                          height: 11,
+                          borderRadius: 5.5,
+                          borderWidth: 1.5,
+                          borderColor: COLORS.primary,
+                        }}
+                      />
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: 3,
+                          width: 1.5,
+                          height: 4,
+                          backgroundColor: COLORS.primary,
+                        }}
+                      />
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: 5,
+                          left: 7.5,
+                          width: 3,
+                          height: 1.5,
+                          backgroundColor: COLORS.primary,
+                        }}
+                      />
                     </>
                   )}
                 </View>
               </View>
-              <Text style={{ color: alarm.isEnabled ? COLORS.accent : COLORS.textMuted, fontSize: 12 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 3,
+                  gap: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    color: alarm.isEnabled ? eventColor : COLORS.textMuted,
+                    fontSize: 13,
+                  }}
+                  numberOfLines={1}
+                >
+                  {isAbsolute
+                    ? formatTime24(alarm.absoluteHour, alarm.absoluteMinute)
+                    : `${formatOffset(alarm.offsetMinutes)} ${eventLabel.toLowerCase()}`}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  color: alarm.isEnabled
+                    ? COLORS.textSecondary
+                    : COLORS.textMuted,
+                  fontSize: 11,
+                  marginBottom: 2,
+                }}
+              >
+                {formatRepeatDays(alarm.repeatMode, alarm.repeatDays, alarm.nextTriggerAt)}
+              </Text>
+              <Text
+                style={{
+                  color: alarm.isEnabled ? COLORS.accent : COLORS.textMuted,
+                  fontSize: 12,
+                }}
+              >
                 {alarm.isEnabled
                   ? alarm.nextTriggerAt
                     ? formatTimeUntil(new Date(alarm.nextTriggerAt))

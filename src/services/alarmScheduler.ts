@@ -12,9 +12,12 @@ import type { Alarm, SunTimes } from '../models/types';
 import {
   computeTriggerTime,
   computeAbsoluteTriggerTime,
+  computeNextTriggerForDays,
+  computeNextRelativeTriggerForDays,
   formatTime,
   formatTime24,
   formatOffset,
+  formatRepeatDays,
 } from '../utils/timeUtils';
 import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID } from '../utils/constants';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -166,13 +169,20 @@ function getAlarmTriggerTime(
   alarm: Alarm,
   sunTimes: SunTimes | null,
 ): Date | null {
+  const hasDays = alarm.repeatDays && alarm.repeatDays.length > 0;
+
   if (alarm.type === 'absolute') {
-    return computeAbsoluteTriggerTime(alarm.absoluteHour, alarm.absoluteMinute);
+    return hasDays
+      ? computeNextTriggerForDays(alarm.absoluteHour, alarm.absoluteMinute, alarm.repeatDays)
+      : computeAbsoluteTriggerTime(alarm.absoluteHour, alarm.absoluteMinute);
   }
 
   // Relative alarm requires sun times
   if (!sunTimes) return null;
   const eventTime = sunTimes[alarm.referenceEvent];
+  if (hasDays) {
+    return computeNextRelativeTriggerForDays(eventTime, alarm.offsetMinutes, alarm.repeatDays);
+  }
   return computeTriggerTime(eventTime, alarm.offsetMinutes);
 }
 
@@ -180,12 +190,13 @@ function getAlarmTriggerTime(
  * Build the notification body text based on alarm type.
  */
 function getAlarmBody(alarm: Alarm, triggerTime: Date): string {
+  const repeatLabel = formatRepeatDays(alarm.repeatMode, alarm.repeatDays);
   if (alarm.type === 'absolute') {
-    return `Daily at ${formatTime24(alarm.absoluteHour, alarm.absoluteMinute)}`;
+    return `${repeatLabel} at ${formatTime24(alarm.absoluteHour, alarm.absoluteMinute)}`;
   }
   const eventLabel = alarm.referenceEvent === 'sunrise' ? 'Sunrise' : 'Sunset';
   const offsetLabel = formatOffset(alarm.offsetMinutes);
-  return `${offsetLabel} ${eventLabel.toLowerCase()} \u2022 ${formatTime(triggerTime)}`;
+  return `${offsetLabel} ${eventLabel.toLowerCase()} \u2022 ${repeatLabel} \u2022 ${formatTime(triggerTime)}`;
 }
 
 export type ScheduleFailure =

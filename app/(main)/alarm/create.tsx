@@ -13,7 +13,9 @@ import { scheduleAlarm, type ScheduleFailure } from '../../../src/services/alarm
 import { updatePersistentNotification } from '../../../src/services/persistentNotificationService';
 import { formatTime, computeTriggerTime, computeAbsoluteTriggerTime } from '../../../src/utils/timeUtils';
 import { COLORS } from '../../../src/utils/constants';
-import type { AlarmType, AlarmMode, AlarmStyle } from '../../../src/models/types';
+import { DayPills } from '../../../src/components/DayPills';
+import { formatRepeatDays } from '../../../src/utils/timeUtils';
+import type { AlarmType, AlarmMode, AlarmStyle, RepeatMode } from '../../../src/models/types';
 
 export default function CreateAlarmScreen() {
   const router = useRouter();
@@ -23,6 +25,8 @@ export default function CreateAlarmScreen() {
 
   const [name, setName] = useState('');
   const [alarmStyle, setAlarmStyle] = useState<AlarmStyle>('alarm');
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('once');
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [alarmType, setAlarmType] = useState<AlarmType>('relative');
 
   // Relative fields
@@ -73,6 +77,12 @@ export default function CreateAlarmScreen() {
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+    if (repeatMode === 'repeat' && repeatDays.length === 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Days required', 'Please select at least one day for a repeating alarm.');
+      return;
+    }
+
     const alarmId = addAlarm({
       name: name.trim(),
       type: alarmType,
@@ -81,6 +91,8 @@ export default function CreateAlarmScreen() {
       absoluteHour,
       absoluteMinute,
       alarmStyle,
+      repeatMode,
+      repeatDays,
     });
 
     // Compute nextTriggerAt immediately so persistent notification can show it
@@ -136,6 +148,17 @@ export default function CreateAlarmScreen() {
         />
       }
     >
+      {/* Sun times display with interactive mode selector */}
+      <SunTimesDisplay
+        sunTimes={todaySunTimes}
+        isValid={!!todaySunTimes && isSunTimesValid(todaySunTimes)}
+        mode={currentMode}
+        onModeChange={handleModeChange}
+        alarmTime={previewTime}
+      />
+
+      <View style={{ height: 16 }} />
+
       {/* Name */}
       <TextInput
         value={name}
@@ -179,18 +202,51 @@ export default function CreateAlarmScreen() {
         ))}
       </View>
 
-      {/* Sun times display with interactive mode selector */}
-      <SunTimesDisplay
-        sunTimes={todaySunTimes}
-        isValid={!!todaySunTimes && isSunTimesValid(todaySunTimes)}
-        mode={currentMode}
-        onModeChange={handleModeChange}
-        alarmTime={previewTime}
-      />
+      {/* Repeat mode toggle */}
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+        {(['once', 'repeat'] as const).map((mode) => (
+          <Pressable
+            key={mode}
+            onPress={() => {
+              Haptics.selectionAsync();
+              if (mode === 'once' && repeatMode === 'repeat') {
+                setRepeatDays(repeatDays.length > 0 ? [repeatDays[0]] : []);
+              } else if (mode === 'repeat' && repeatMode === 'once') {
+                setRepeatDays(repeatDays.length > 0 ? repeatDays : [0, 1, 2, 3, 4, 5, 6]);
+              }
+              setRepeatMode(mode);
+            }}
+            style={{
+              flex: 1,
+              paddingVertical: 12,
+              borderRadius: 12,
+              backgroundColor: repeatMode === mode ? COLORS.surfaceLight : COLORS.surface,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{
+              color: repeatMode === mode ? COLORS.textPrimary : COLORS.textMuted,
+              fontSize: 15,
+              fontWeight: repeatMode === mode ? '700' : '400',
+            }}>
+              {mode === 'once' ? 'Once' : 'Repeat'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {/* Day pills */}
+      <View style={{ marginBottom: 16, alignItems: 'center' }}>
+        <DayPills
+          repeatMode={repeatMode}
+          selectedDays={repeatDays}
+          onDaysChange={setRepeatDays}
+        />
+      </View>
 
       {/* Conditional: Relative offset picker */}
       {alarmType === 'relative' && (
-        <View style={{ backgroundColor: COLORS.surface, borderRadius: 12, padding: 12, marginTop: 16 }}>
+        <View style={{ backgroundColor: COLORS.surface, borderRadius: 12, padding: 12 }}>
           <TimeOffsetPicker
             hours={hours}
             minutes={minutes}
@@ -202,7 +258,7 @@ export default function CreateAlarmScreen() {
 
       {/* Conditional: Absolute time picker */}
       {alarmType === 'absolute' && (
-        <View style={{ backgroundColor: COLORS.surface, borderRadius: 12, padding: 12, marginTop: 16 }}>
+        <View style={{ backgroundColor: COLORS.surface, borderRadius: 12, padding: 12 }}>
           <AbsoluteTimePicker
             hour={absoluteHour}
             minute={absoluteMinute}
@@ -225,7 +281,7 @@ export default function CreateAlarmScreen() {
             {formatTime(previewTime)}
           </Text>
           <Text style={{ color: COLORS.textMuted, fontSize: 13 }}>
-            {alarmType === 'relative' ? `based on ${referenceEvent}` : 'daily'}
+            {alarmType === 'relative' ? `based on ${referenceEvent}` : formatRepeatDays(repeatMode, repeatDays)}
           </Text>
         </View>
       )}

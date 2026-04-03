@@ -1,6 +1,7 @@
 export type AlarmType = 'relative' | 'absolute';
 export type AlarmMode = 'before-sunrise' | 'after-sunrise' | 'before-sunset' | 'after-sunset' | 'fixed';
 export type AlarmStyle = 'alarm' | 'reminder';
+export type RepeatMode = 'once' | 'repeat';
 
 export interface Alarm {
   id: string;
@@ -16,6 +17,8 @@ export interface Alarm {
   absoluteMinute: number; // 0-59
 
   alarmStyle: AlarmStyle;
+  repeatMode: RepeatMode;
+  repeatDays: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
   isEnabled: boolean;
   soundUri: string | null;
   vibrate: boolean;

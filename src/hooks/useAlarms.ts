@@ -24,7 +24,7 @@ export function useAlarms(sunTimes: SunTimes | null) {
   // but NOT when nextTriggerAt or notificationId change (which recalculate sets)
   const alarmFingerprint = useMemo(() => {
     return Object.values(alarms)
-      .map((a) => `${a.id}:${a.type}:${a.referenceEvent}:${a.offsetMinutes}:${a.absoluteHour}:${a.absoluteMinute}:${a.isEnabled}`)
+      .map((a) => `${a.id}:${a.type}:${a.referenceEvent}:${a.offsetMinutes}:${a.absoluteHour}:${a.absoluteMinute}:${a.isEnabled}:${a.repeatMode}:${(a.repeatDays ?? []).join(',')}`)
       .sort()
       .join('|');
   }, [alarms]);
