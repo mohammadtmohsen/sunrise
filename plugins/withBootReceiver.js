@@ -9,7 +9,6 @@ const BOOT_RECEIVER_KOTLIN = `package com.lumora.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 
 class BootAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -17,18 +16,11 @@ class BootAlarmReceiver : BroadcastReceiver() {
             intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
             intent.action == "com.htc.intent.action.QUICKBOOT_POWERON"
         ) {
-            val serviceIntent = Intent(context, BootAlarmTaskService::class.java)
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
-            } catch (e: Exception) {
-                // Fallback: try regular service start
-                try {
-                    context.startService(serviceIntent)
-                } catch (_: Exception) {}
+                val serviceIntent = Intent(context, BootAlarmTaskService::class.java)
+                context.startService(serviceIntent)
+            } catch (_: Exception) {
+                // Service start may fail on some OEMs
             }
         }
     }
@@ -43,11 +35,11 @@ import com.facebook.react.bridge.Arguments
 import com.facebook.react.jstasks.HeadlessJsTaskConfig
 
 class BootAlarmTaskService : HeadlessJsTaskService() {
-    override fun getTaskConfig(intent: Intent): HeadlessJsTaskConfig {
+    override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig? {
         return HeadlessJsTaskConfig(
             "RESCHEDULE_ALARMS_ON_BOOT",
             Arguments.createMap(),
-            60000,
+            60000L,
             true
         )
     }

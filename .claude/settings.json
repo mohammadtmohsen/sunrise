@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(eas build:view 1392095c-004a-494d-a623-9b32ee307adf --json)",
+      "Bash(python3 -c ':*)",
+      "WebFetch(domain:job-logs.eascdn.net)",
+      "Bash(xargs curl:*)"
+    ]
+  }
+}
