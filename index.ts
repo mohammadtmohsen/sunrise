@@ -49,12 +49,15 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
     case EventType.DELIVERED:
       if (isReminder) {
         // Reminder — don't store pending alarm, just let notification stay visible
-        console.log('[BackgroundEvent] DELIVERED reminder — no action');
+        console.log('[BackgroundEvent] DELIVERED reminder — updating persistent notification');
       } else {
         // Full alarm — store for when app opens
         console.log('[BackgroundEvent] DELIVERED — storing pending alarm:', alarmId);
         mmkv.set('pending-alarm-id', alarmId);
       }
+      // Update persistent notification immediately so chronometer switches to next alarm
+      // instead of counting past zero on the fired alarm
+      await updatePersistentNotification();
       break;
     case EventType.PRESS:
       if (isReminder) {
@@ -79,6 +82,11 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
         await stopAlarmSound();
         if (alarm) {
           await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
+          // Update nextTriggerAt to snooze time so persistent notification shows correct countdown
+          const snoozeAt = new Date(Date.now() + alarm.snoozeDurationMinutes * 60 * 1000);
+          useAlarmStore.getState().updateAlarm(alarmId, {
+            nextTriggerAt: snoozeAt.toISOString(),
+          });
           await dismissAlarm(alarmId);
         }
         await updatePersistentNotification();
@@ -146,6 +154,9 @@ notifee.registerForegroundService((notification) => {
           console.warn('[ForegroundService] Failed to create persist notification:', err);
         }
 
+        // Update persistent notification so chronometer switches to next alarm
+        await updatePersistentNotification();
+
         resolve();
       }, 15000);
       return;
@@ -192,10 +203,16 @@ notifee.registerForegroundService((notification) => {
       }, 800);
     }
 
-    // Auto-cleanup after 5 minutes to prevent zombie foreground services
-    setTimeout(() => {
+    // Auto-cleanup after 5 minutes to prevent zombie foreground services.
+    // Also dismiss the alarm and schedule the next occurrence so it isn't lost.
+    setTimeout(async () => {
       console.log('[ForegroundService] Auto-cleanup after timeout');
-      stopAlarmSound().catch(() => {});
+      await stopAlarmSound();
+      if (alarmId) {
+        await dismissAlarm(alarmId);
+        await scheduleNextDayAlarm(alarmId);
+        await updatePersistentNotification();
+      }
       resolve();
     }, 5 * 60 * 1000);
   });

@@ -8,6 +8,7 @@ interface SettingsState {
   defaultVibrate: boolean;
   hasCompletedOnboarding: boolean;
   showPersistentNotification: boolean;
+  forceAlarmEvents: boolean;
   customSoundUri: string | null;
   customSoundName: string | null;
   customReminderSoundUri: string | null;
@@ -16,6 +17,7 @@ interface SettingsState {
   setDefaultVibrate: (vibrate: boolean) => void;
   setOnboardingComplete: () => void;
   setShowPersistentNotification: (show: boolean) => void;
+  setForceAlarmEvents: (force: boolean) => void;
   setCustomSound: (uri: string, name: string) => void;
   clearCustomSound: () => void;
   setCustomReminderSound: (uri: string, name: string) => void;
@@ -26,9 +28,10 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       defaultSnoozeDuration: DEFAULT_SNOOZE_MINUTES,
-      defaultVibrate: true,
+      defaultVibrate: false,
       hasCompletedOnboarding: false,
-      showPersistentNotification: false,
+      showPersistentNotification: true,
+      forceAlarmEvents: true,
       customSoundUri: null,
       customSoundName: null,
       customReminderSoundUri: null,
@@ -40,6 +43,7 @@ export const useSettingsStore = create<SettingsState>()(
       setOnboardingComplete: () => set({ hasCompletedOnboarding: true }),
       setShowPersistentNotification: (show) =>
         set({ showPersistentNotification: show }),
+      setForceAlarmEvents: (force) => set({ forceAlarmEvents: force }),
       setCustomSound: (uri, name) =>
         set({ customSoundUri: uri, customSoundName: name }),
       clearCustomSound: () =>

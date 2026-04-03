@@ -23,6 +23,18 @@ import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID } from '../utils/constants';
 import { useSettingsStore } from '../stores/settingsStore';
 
 /**
+ * Get the alarm manager type based on the forceAlarmEvents setting.
+ * SET_ALARM_CLOCK: most reliable, shows alarm icon in status bar.
+ * SET_EXACT_AND_ALLOW_WHILE_IDLE: still fires in Doze, no status bar icon.
+ */
+function getAlarmManagerType(): AlarmType {
+  const { forceAlarmEvents } = useSettingsStore.getState();
+  return forceAlarmEvents
+    ? AlarmType.SET_ALARM_CLOCK
+    : AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE;
+}
+
+/**
  * Ensure Android exact alarm permission is granted.
  * On Android 12+, SCHEDULE_EXACT_ALARM must be explicitly enabled by the user.
  * Returns true if scheduling can proceed.
@@ -207,7 +219,7 @@ export type ScheduleFailure =
   | 'error';
 
 export type ScheduleResult =
-  | { success: true; notificationId: string }
+  | { success: true; notificationId: string; triggerTime: Date }
   | { success: false; reason: ScheduleFailure };
 
 /**
@@ -262,7 +274,6 @@ export async function scheduleAlarm(
               lightUpScreen: true,
               autoCancel: false,
               ongoing: false,
-              asForegroundService: true,
               pressAction: { id: 'default' },
               actions: [
                 {
@@ -341,14 +352,14 @@ export async function scheduleAlarm(
         type: TriggerType.TIMESTAMP,
         timestamp: triggerTime.getTime(),
         alarmManager: {
-          type: AlarmType.SET_ALARM_CLOCK,
+          type: getAlarmManagerType(),
           allowWhileIdle: true,
         },
       },
     );
 
     console.log('[scheduleAlarm] Scheduled:', alarm.id, 'at', triggerTime.toISOString());
-    return { success: true, notificationId };
+    return { success: true, notificationId, triggerTime };
   } catch (error) {
     console.error('[scheduleAlarm] Failed to create trigger notification:', error);
     return { success: false, reason: 'error' };
@@ -472,7 +483,7 @@ export async function scheduleSnooze(
       type: TriggerType.TIMESTAMP,
       timestamp: snoozeTime,
       alarmManager: {
-        type: AlarmType.SET_ALARM_CLOCK,
+        type: getAlarmManagerType(),
         allowWhileIdle: true,
       },
     },

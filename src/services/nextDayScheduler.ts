@@ -29,7 +29,13 @@ export async function scheduleNextDayAlarm(alarmId: string): Promise<void> {
   if (alarm.type === 'absolute') {
     const result = await scheduleAlarm(alarm, null);
     if (result.success) {
-      useAlarmStore.getState().updateAlarm(alarmId, { notificationId: result.notificationId });
+      useAlarmStore.getState().updateAlarm(alarmId, {
+        notificationId: result.notificationId,
+        nextTriggerAt: result.triggerTime.toISOString(),
+      });
+    } else {
+      // Clear stale notificationId so useRescheduleOnResume can retry
+      useAlarmStore.getState().updateAlarm(alarmId, { notificationId: null });
     }
     await updatePersistentNotification();
     return;
@@ -48,7 +54,13 @@ export async function scheduleNextDayAlarm(alarmId: string): Promise<void> {
 
   const result = await scheduleAlarm(alarm, tomorrowSunTimes);
   if (result.success) {
-    useAlarmStore.getState().updateAlarm(alarmId, { notificationId: result.notificationId });
+    useAlarmStore.getState().updateAlarm(alarmId, {
+      notificationId: result.notificationId,
+      nextTriggerAt: result.triggerTime.toISOString(),
+    });
+  } else {
+    // Clear stale notificationId so useRescheduleOnResume can retry
+    useAlarmStore.getState().updateAlarm(alarmId, { notificationId: null });
   }
   await updatePersistentNotification();
 }

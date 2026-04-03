@@ -36,6 +36,7 @@ export function useRescheduleOnResume() {
         if (result.success) {
           useAlarmStore.getState().updateAlarm(alarm.id, {
             notificationId: result.notificationId,
+            nextTriggerAt: result.triggerTime.toISOString(),
           });
         }
       }

@@ -114,6 +114,7 @@ export default function CreateAlarmScreen() {
       if (result.success) {
         useAlarmStore.getState().updateAlarm(alarmId, {
           notificationId: result.notificationId,
+          nextTriggerAt: result.triggerTime.toISOString(),
         });
       } else {
         const messages: Record<ScheduleFailure, string> = {

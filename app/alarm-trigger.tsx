@@ -36,6 +36,7 @@ import { useAlarmStore } from '../src/stores/alarmStore';
 import { playAlarmSound, stopAlarmSound } from '../src/services/soundService';
 import { dismissAlarm, scheduleSnooze } from '../src/services/alarmScheduler';
 import { scheduleNextDayAlarm } from '../src/services/nextDayScheduler';
+import { updatePersistentNotification } from '../src/services/persistentNotificationService';
 import { formatTime } from '../src/utils/timeUtils';
 import { COLORS } from '../src/utils/constants';
 
@@ -127,6 +128,13 @@ export default function AlarmTriggerScreen() {
     await stopAlarmSound();
     if (alarm) {
       await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
+      // Update nextTriggerAt to the snooze time so the persistent notification
+      // shows the correct countdown until the snooze fires
+      const snoozeAt = new Date(Date.now() + alarm.snoozeDurationMinutes * 60 * 1000);
+      useAlarmStore.getState().updateAlarm(alarm.id, {
+        nextTriggerAt: snoozeAt.toISOString(),
+      });
+      await updatePersistentNotification();
     }
     if (router.canGoBack()) {
       router.back();

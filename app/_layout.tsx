@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, Platform, type AppStateStatus } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import notifee, { EventType } from '@notifee/react-native';
 import { useLocation } from '../src/hooks/useLocation';
 import { useAlarmStore } from '../src/stores/alarmStore';
+import { useLocationStore } from '../src/stores/locationStore';
 import { mmkv } from '../src/stores/storage';
 import {
   setupNotificationChannel,
@@ -14,6 +15,8 @@ import {
   requestNotificationPermission,
   setupIOSCategories,
 } from '../src/services/notificationService';
+import { scheduleAllAlarms } from '../src/services/alarmScheduler';
+import { getSunTimes, isSunTimesValid } from '../src/services/sunCalcService';
 
 import { updatePersistentNotification } from '../src/services/persistentNotificationService';
 import { dismissAlarm, scheduleSnooze } from '../src/services/alarmScheduler';
@@ -52,6 +55,25 @@ export default function RootLayout() {
       await registerBackgroundRecalculation();
       await scheduleDailyMaintenance();
       useSettingsStore.getState().setOnboardingComplete();
+
+      // Re-register all enabled alarms with AlarmManager on every app open.
+      // This handles: first install (alarms lost before boot receiver runs),
+      // OS clearing alarm registrations, and permission grants since last open.
+      // Only proceeds if exact alarm permission is already granted — avoids
+      // showing permission prompts on every app open (prompts happen on alarm save).
+      const hasAlarmPerm = Platform.OS !== 'android' ||
+        (await notifee.getNotificationSettings()).android?.alarm === 1;
+      if (hasAlarmPerm) {
+        const loc = useLocationStore.getState().location;
+        const sun = loc ? getSunTimes(loc.latitude, loc.longitude) : null;
+        if (!sun || isSunTimesValid(sun)) {
+          const enabled = Object.values(useAlarmStore.getState().alarms).filter(a => a.isEnabled);
+          if (enabled.length > 0) {
+            await scheduleAllAlarms(enabled, sun);
+          }
+        }
+      }
+
       await updatePersistentNotification();
     }
     init();
@@ -108,9 +130,14 @@ export default function RootLayout() {
         case EventType.ACTION_PRESS:
           if (detail.pressAction?.id === 'snooze' && alarmId) {
             stopAlarmSound();
-            const alarm = useAlarmStore.getState().alarms[alarmId];
-            if (alarm) {
-              scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
+            const alarmForSnooze = useAlarmStore.getState().alarms[alarmId];
+            if (alarmForSnooze) {
+              scheduleSnooze(alarmForSnooze, alarmForSnooze.snoozeDurationMinutes);
+              // Update nextTriggerAt to snooze time so persistent notification shows correct countdown
+              const snoozeAt = new Date(Date.now() + alarmForSnooze.snoozeDurationMinutes * 60 * 1000);
+              useAlarmStore.getState().updateAlarm(alarmId, {
+                nextTriggerAt: snoozeAt.toISOString(),
+              });
             }
             dismissAlarm(alarmId);
             updatePersistentNotification();

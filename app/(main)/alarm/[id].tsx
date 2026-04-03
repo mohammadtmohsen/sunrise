@@ -121,7 +121,10 @@ export default function EditAlarmScreen() {
     if (updated) {
       const result = await scheduleAlarm(updated, todaySunTimes);
       if (result.success) {
-        updateAlarm(id!, { notificationId: result.notificationId });
+        updateAlarm(id!, {
+          notificationId: result.notificationId,
+          nextTriggerAt: result.triggerTime.toISOString(),
+        });
       } else {
         const messages: Record<ScheduleFailure, string> = {
           'disabled': 'The alarm is disabled.',
