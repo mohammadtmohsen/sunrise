@@ -195,7 +195,15 @@ function getAlarmTriggerTime(
   if (hasDays) {
     return computeNextRelativeTriggerForDays(eventTime, alarm.offsetMinutes, alarm.repeatDays);
   }
-  return computeTriggerTime(eventTime, alarm.offsetMinutes);
+  const triggerTime = computeTriggerTime(eventTime, alarm.offsetMinutes);
+  // If trigger time is past, shift to next day so re-enabled "once" alarms
+  // and freshly scheduled alarms always resolve to a future occurrence
+  if (triggerTime.getTime() <= Date.now()) {
+    const nextDay = new Date(triggerTime);
+    nextDay.setDate(nextDay.getDate() + 1);
+    return nextDay;
+  }
+  return triggerTime;
 }
 
 /**
