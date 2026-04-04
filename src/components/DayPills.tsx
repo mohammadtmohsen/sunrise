@@ -65,29 +65,29 @@ export function DayPills({ repeatMode, selectedDays, onDaysChange }: Props) {
         );
       })}
 
-      {repeatMode === 'repeat' && (
-        <Pressable
-          onPress={handleAllPress}
+      <Pressable
+        onPress={handleAllPress}
+        disabled={repeatMode === 'once'}
+        style={{
+          paddingHorizontal: 12,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: allSelected && repeatMode === 'repeat' ? COLORS.primary : COLORS.surface,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: repeatMode === 'once' ? 0.3 : 1,
+        }}
+      >
+        <Text
           style={{
-            paddingHorizontal: 12,
-            height: 34,
-            borderRadius: 17,
-            backgroundColor: allSelected ? COLORS.primary : COLORS.surface,
-            alignItems: 'center',
-            justifyContent: 'center',
+            color: allSelected && repeatMode === 'repeat' ? '#ffffff' : COLORS.textMuted,
+            fontSize: 13,
+            fontWeight: allSelected && repeatMode === 'repeat' ? '700' : '400',
           }}
         >
-          <Text
-            style={{
-              color: allSelected ? '#ffffff' : COLORS.textMuted,
-              fontSize: 13,
-              fontWeight: allSelected ? '700' : '400',
-            }}
-          >
-            All
-          </Text>
-        </Pressable>
-      )}
+          All
+        </Text>
+      </Pressable>
     </View>
   );
 }

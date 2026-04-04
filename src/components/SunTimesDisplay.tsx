@@ -13,7 +13,7 @@ import Svg, {
 } from 'react-native-svg';
 import type { SunTimes, AlarmMode } from '../models/types';
 import { formatTime, formatTimeUntil } from '../utils/timeUtils';
-import { SunriseIcon, SunsetIcon, AlarmIcon, LocationIcon } from './Icons';
+import { SunriseIcon, SunsetIcon, LocationIcon } from './Icons';
 import { COLORS } from '../utils/constants';
 
 interface Props {
@@ -512,24 +512,24 @@ export function SunTimesDisplay({ sunTimes, isValid, mode, onModeChange, alarmTi
             borderColor: isInteractive && isSunriseSelected
               ? 'rgba(255,107,53,0.5)'
               : 'rgba(255,107,53,0.1)',
-            opacity: 1,
           }}
           accessibilityLabel={`Sunrise at ${formatTime(sunTimes.sunrise)}, ${formatTimeUntil(sunTimes.sunrise)}`}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            <SunriseIcon size={20} />
-            <Text style={{
-              color: COLORS.textMuted, fontSize: 11, marginLeft: 6,
-              textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: '500',
-            }}>
-              Sunrise
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <SunriseIcon size={28} />
+            <View style={{ marginLeft: 10, flex: 1 }}>
+              <Text style={{
+                color: COLORS.sunrise, fontSize: 14, fontWeight: '600',
+              }}>
+                Sunrise
+              </Text>
+              <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 2 }}>
+                {formatTimeUntil(sunTimes.sunrise)}
+              </Text>
+            </View>
           </View>
-          <Text style={{ color: COLORS.sunrise, fontSize: 24, fontWeight: '700', letterSpacing: -0.5 }}>
+          <Text style={{ color: COLORS.sunrise, fontSize: 26, fontWeight: '700', letterSpacing: -0.5, marginTop: 8 }}>
             {formatTime(sunTimes.sunrise)}
-          </Text>
-          <Text style={{ color: COLORS.textMuted, fontSize: 12, marginTop: 4 }}>
-            {formatTimeUntil(sunTimes.sunrise)}
           </Text>
           {isInteractive && (
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
@@ -560,24 +560,24 @@ export function SunTimesDisplay({ sunTimes, isValid, mode, onModeChange, alarmTi
             borderColor: isInteractive && isSunsetSelected
               ? 'rgba(196,69,105,0.5)'
               : 'rgba(196,69,105,0.1)',
-            opacity: 1,
           }}
           accessibilityLabel={`Sunset at ${formatTime(sunTimes.sunset)}, ${formatTimeUntil(sunTimes.sunset)}`}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            <SunsetIcon size={20} />
-            <Text style={{
-              color: COLORS.textMuted, fontSize: 11, marginLeft: 6,
-              textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: '500',
-            }}>
-              Sunset
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <SunsetIcon size={28} />
+            <View style={{ marginLeft: 10, flex: 1 }}>
+              <Text style={{
+                color: COLORS.sunset, fontSize: 14, fontWeight: '600',
+              }}>
+                Sunset
+              </Text>
+              <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 2 }}>
+                {formatTimeUntil(sunTimes.sunset)}
+              </Text>
+            </View>
           </View>
-          <Text style={{ color: COLORS.sunset, fontSize: 24, fontWeight: '700', letterSpacing: -0.5 }}>
+          <Text style={{ color: COLORS.sunset, fontSize: 26, fontWeight: '700', letterSpacing: -0.5, marginTop: 8 }}>
             {formatTime(sunTimes.sunset)}
-          </Text>
-          <Text style={{ color: COLORS.textMuted, fontSize: 12, marginTop: 4 }}>
-            {formatTimeUntil(sunTimes.sunset)}
           </Text>
           {isInteractive && (
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
@@ -627,7 +627,7 @@ export function SunTimesDisplay({ sunTimes, isValid, mode, onModeChange, alarmTi
           accessibilityState={{ selected: isFixedSelected }}
           accessibilityLabel="Fixed time alarm"
         >
-          <AlarmIcon size={14} />
+          <Text style={{ fontSize: 12 }}>⏰</Text>
           <Text style={{
             color: isFixedSelected ? '#ffffff' : COLORS.textMuted,
             fontSize: 13,

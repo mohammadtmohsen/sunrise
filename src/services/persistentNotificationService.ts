@@ -28,11 +28,14 @@ function getFutureAlarms(alarms: Record<string, Alarm>): Alarm[] {
 function formatRelativeTime(triggerAt: number): string {
   const diff = triggerAt - Date.now();
   if (diff <= 0) return 'now';
-  const hours = Math.floor(diff / (60 * 60 * 1000));
+  const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+  const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
   const minutes = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
-  if (hours > 0 && minutes > 0) return `in ${hours}h ${minutes}m`;
-  if (hours > 0) return `in ${hours}h`;
-  return `in ${minutes}m`;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  return `in ${parts.join(' ') || '0m'}`;
 }
 
 /**
@@ -47,12 +50,13 @@ function buildSunLine(sunTimes: SunTimes): string {
  * Android InboxStyle supports ~5-7 visible lines when expanded.
  */
 function buildAlarmLines(futureAlarms: Alarm[]): string[] {
-  return futureAlarms.slice(0, 7).map(a => {
+  return futureAlarms.map(a => {
     const triggerDate = new Date(a.nextTriggerAt!);
     const triggerMs = triggerDate.getTime();
     const relative = formatRelativeTime(triggerMs);
     const style = a.alarmStyle === 'reminder' ? '🔔' : '⏰';
-    return `${style}  ${a.name}  ·  ${formatTime(triggerDate)}  (${relative})`;
+    const repeat = (a.repeatMode ?? 'once') === 'repeat' ? '∞' : '①';
+    return `${style}  ${a.name}  ·  ${formatTime(triggerDate)}  (${relative})  ${repeat}`;
   });
 }
 
@@ -103,8 +107,9 @@ export async function updatePersistentNotification(): Promise<void> {
       const triggerDate = new Date(nextAlarm.nextTriggerAt);
       const triggerAt = triggerDate.getTime();
 
-      // Title: alarm name + exact trigger time
-      title = `${nextAlarm.name}  ·  ${formatTime(triggerDate)}`;
+      // Title: alarm name + exact trigger time + repeat icon
+      const repeatIcon = (nextAlarm.repeatMode ?? 'once') === 'repeat' ? '∞' : '①';
+      title = `${nextAlarm.name}  ·  ${formatTime(triggerDate)}  ${repeatIcon}`;
 
       // Body: sunrise + sunset
       body = sunTimes

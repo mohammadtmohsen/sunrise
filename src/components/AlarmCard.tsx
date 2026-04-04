@@ -280,7 +280,7 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
                     color:
                       (alarm.repeatMode ?? 'once') === 'repeat'
                         ? COLORS.success
-                        : COLORS.textSecondary,
+                        : COLORS.accent,
                     fontSize: 12,
                     fontWeight: '900',
                   }}
@@ -324,68 +324,9 @@ export function AlarmCard({ alarm, onToggle, onPress, onDelete }: Props) {
                     opacity: alarm.isEnabled ? 0.7 : 0.3,
                   }}
                 >
-                  {alarm.alarmStyle === 'reminder' ? (
-                    <>
-                      <View
-                        style={{
-                          width: 10,
-                          height: 8,
-                          borderTopLeftRadius: 5,
-                          borderTopRightRadius: 5,
-                          backgroundColor: COLORS.accent,
-                        }}
-                      />
-                      <View
-                        style={{
-                          width: 14,
-                          height: 1.5,
-                          backgroundColor: COLORS.accent,
-                          marginTop: 0.5,
-                          borderRadius: 1,
-                        }}
-                      />
-                      <View
-                        style={{
-                          width: 3,
-                          height: 3,
-                          borderRadius: 1.5,
-                          backgroundColor: COLORS.accent,
-                          marginTop: 0.5,
-                        }}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <View
-                        style={{
-                          width: 11,
-                          height: 11,
-                          borderRadius: 5.5,
-                          borderWidth: 1.5,
-                          borderColor: COLORS.primary,
-                        }}
-                      />
-                      <View
-                        style={{
-                          position: 'absolute',
-                          top: 3,
-                          width: 1.5,
-                          height: 4,
-                          backgroundColor: COLORS.primary,
-                        }}
-                      />
-                      <View
-                        style={{
-                          position: 'absolute',
-                          top: 5,
-                          left: 7.5,
-                          width: 3,
-                          height: 1.5,
-                          backgroundColor: COLORS.primary,
-                        }}
-                      />
-                    </>
-                  )}
+                  <Text style={{ fontSize: 13, lineHeight: 16 }}>
+                    {alarm.alarmStyle === 'reminder' ? '🔔' : '⏰'}
+                  </Text>
                 </View>
               </View>
               <View

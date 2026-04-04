@@ -197,7 +197,7 @@ export default function CreateAlarmScreen() {
               paddingVertical: 12,
               borderRadius: 12,
               backgroundColor: alarmStyle === style
-                ? (style === 'alarm' ? COLORS.primary : COLORS.accent)
+                ? COLORS.surfaceLight
                 : COLORS.surface,
               alignItems: 'center',
             }}
@@ -207,7 +207,7 @@ export default function CreateAlarmScreen() {
               fontSize: 15,
               fontWeight: alarmStyle === style ? '700' : '400',
             }}>
-              {style === 'alarm' ? 'Alarm' : 'Reminder'}
+              {style === 'alarm' ? '⏰ Alarm' : '🔔 Reminder'}
             </Text>
           </Pressable>
         ))}
@@ -240,6 +240,9 @@ export default function CreateAlarmScreen() {
               fontSize: 15,
               fontWeight: repeatMode === mode ? '700' : '400',
             }}>
+              <Text style={{ color: mode === 'once' ? COLORS.accent : COLORS.success }}>
+                {mode === 'once' ? '\u2460 ' : '\u221E '}
+              </Text>
               {mode === 'once' ? 'Once' : 'Repeat'}
             </Text>
           </Pressable>
