@@ -53,12 +53,12 @@ export default function HomeScreen() {
   const renderHeader = useCallback(
     () => (
       <View style={{ paddingTop: 8, paddingBottom: 8 }}>
-        <SunTimesDisplay sunTimes={todaySunTimes} isValid={isValid} isRefreshing={locationLoading} />
+        <SunTimesDisplay sunTimes={todaySunTimes} isValid={isValid} />
         <PermissionBanner />
         <BatteryOptimizationPrompt />
       </View>
     ),
-    [todaySunTimes, isValid, locationLoading],
+    [todaySunTimes, isValid],
   );
 
   const renderEmpty = useCallback(

@@ -22,6 +22,7 @@ export default function EditAlarmScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const alarm = useAlarmStore((s) => s.alarms[id!]);
   const updateAlarm = useAlarmStore((s) => s.updateAlarm);
+  const alarms = useAlarmStore((s) => s.alarms);
 
   const { location, isLoading: locationLoading, fetchLocation } = useLocation();
   const { todaySunTimes } = useSunTimes(location);
@@ -86,6 +87,15 @@ export default function EditAlarmScreen() {
     if (!name.trim()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Name required', 'Please enter a name for your alarm.');
+      return;
+    }
+
+    const duplicateName = Object.values(alarms).some(
+      (a) => a.id !== id && a.name.toLowerCase() === name.trim().toLowerCase(),
+    );
+    if (duplicateName) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Duplicate name', 'An alarm with this name already exists. Please choose a different name.');
       return;
     }
     if (repeatMode === 'repeat' && repeatDays.length === 0) {

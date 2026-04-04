@@ -20,6 +20,7 @@ import type { AlarmType, AlarmMode, AlarmStyle, RepeatMode } from '../../../src/
 export default function CreateAlarmScreen() {
   const router = useRouter();
   const addAlarm = useAlarmStore((s) => s.addAlarm);
+  const alarms = useAlarmStore((s) => s.alarms);
   const { location, isLoading: locationLoading, fetchLocation } = useLocation();
   const { todaySunTimes } = useSunTimes(location);
 
@@ -27,7 +28,7 @@ export default function CreateAlarmScreen() {
   const [alarmStyle, setAlarmStyle] = useState<AlarmStyle>('alarm');
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('once');
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
-  const [alarmType, setAlarmType] = useState<AlarmType>('relative');
+  const [alarmType, setAlarmType] = useState<AlarmType>('absolute');
 
   // Relative fields
   const [referenceEvent, setReferenceEvent] = useState<'sunrise' | 'sunset'>('sunrise');
@@ -72,6 +73,15 @@ export default function CreateAlarmScreen() {
     if (!name.trim()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Name required', 'Please enter a name for your alarm.');
+      return;
+    }
+
+    const duplicateName = Object.values(alarms).some(
+      (a) => a.name.toLowerCase() === name.trim().toLowerCase(),
+    );
+    if (duplicateName) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Duplicate name', 'An alarm with this name already exists. Please choose a different name.');
       return;
     }
 

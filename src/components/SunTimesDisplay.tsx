@@ -19,7 +19,6 @@ import { COLORS } from '../utils/constants';
 interface Props {
   sunTimes: SunTimes | null;
   isValid: boolean;
-  isRefreshing?: boolean;
   // Interactive mode (add/edit screen only)
   mode?: AlarmMode;
   onModeChange?: (mode: AlarmMode) => void;
@@ -421,7 +420,7 @@ function DirectionPill({
   );
 }
 
-export function SunTimesDisplay({ sunTimes, isValid, isRefreshing, mode, onModeChange, alarmTime }: Props) {
+export function SunTimesDisplay({ sunTimes, isValid, mode, onModeChange, alarmTime }: Props) {
   const isInteractive = !!onModeChange;
   if (!sunTimes) {
     return (
@@ -640,11 +639,6 @@ export function SunTimesDisplay({ sunTimes, isValid, isRefreshing, mode, onModeC
       )}
 
       {/* Refresh hint */}
-      {isRefreshing && (
-        <Text style={{ color: COLORS.textMuted, fontSize: 11, textAlign: 'center', marginTop: 8 }}>
-          Updating location...
-        </Text>
-      )}
     </View>
   );
 }
