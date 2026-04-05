@@ -6,9 +6,8 @@ import {
   Dimensions,
   StyleSheet,
   Platform,
-  BackHandler,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -40,6 +39,7 @@ import { updatePersistentNotification } from '../src/services/persistentNotifica
 import { formatTime } from '../src/utils/timeUtils';
 import { COLORS } from '../src/utils/constants';
 import { mmkv } from '../src/stores/storage';
+import { exitAndRemoveFromRecents } from '../src/services/notificationSubText';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DISMISS_THRESHOLD = -180;
@@ -62,7 +62,6 @@ function buildArc(w: number, _h: number, horizonY: number): string {
 }
 
 export default function AlarmTriggerScreen() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ alarmId: string }>();
   // Use alarmId from URL params, or fall back to MMKV pending-alarm-id
   // (covers deep links that arrive before pending alarm poll runs)
@@ -128,30 +127,25 @@ export default function AlarmTriggerScreen() {
       await dismissAlarm(alarmId);
       await scheduleNextDayAlarm(alarmId);
     }
-    if (router.canGoBack()) {
-      router.back();
-    }
-    setTimeout(() => BackHandler.exitApp(), 300);
-  }, [alarmId, router]);
+    // Update notifications before exiting — finishAndRemoveTask kills the activity
+    await updatePersistentNotification();
+    exitAndRemoveFromRecents();
+  }, [alarmId]);
 
   const handleSnooze = useCallback(async () => {
     try { await notifee.stopForegroundService(); } catch {}
     await stopAlarmSound();
     if (alarm) {
       await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
-      // Update nextTriggerAt to the snooze time so the persistent notification
-      // shows the correct countdown until the snooze fires
       const snoozeAt = new Date(Date.now() + alarm.snoozeDurationMinutes * 60 * 1000);
       useAlarmStore.getState().updateAlarm(alarm.id, {
         nextTriggerAt: snoozeAt.toISOString(),
       });
-      await updatePersistentNotification();
     }
-    if (router.canGoBack()) {
-      router.back();
-    }
-    setTimeout(() => BackHandler.exitApp(), 300);
-  }, [alarm, router]);
+    // Update notifications before exiting — finishAndRemoveTask kills the activity
+    await updatePersistentNotification();
+    exitAndRemoveFromRecents();
+  }, [alarm]);
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {

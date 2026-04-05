@@ -22,3 +22,20 @@ export async function setNotificationSubText(
     return false;
   }
 }
+
+/**
+ * Finish the current activity and remove the app from the recent tasks list.
+ * Use this instead of BackHandler.exitApp() when dismissing the alarm
+ * so the app doesn't linger in the recents screen.
+ */
+export async function exitAndRemoveFromRecents(): Promise<boolean> {
+  if (Platform.OS !== 'android') return false;
+
+  try {
+    const { NotificationSubText } = NativeModules;
+    if (!NotificationSubText) return false;
+    return await NotificationSubText.finishAndRemoveTask();
+  } catch {
+    return false;
+  }
+}

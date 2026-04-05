@@ -6,6 +6,7 @@ const PACKAGE_DIR = 'com/lumora/app';
 
 const MODULE_KOTLIN = `package com.lumora.app
 
+import android.app.Activity
 import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
@@ -13,6 +14,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.UiThreadUtil
 
 class NotificationSubTextModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
@@ -37,6 +39,23 @@ class NotificationSubTextModule(reactContext: ReactApplicationContext) :
 
             manager.notify(active.tag, active.id, rebuilt)
             promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun finishAndRemoveTask(promise: Promise) {
+        try {
+            val activity: Activity? = currentActivity
+            if (activity != null) {
+                UiThreadUtil.runOnUiThread {
+                    activity.finishAndRemoveTask()
+                }
+                promise.resolve(true)
+            } else {
+                promise.resolve(false)
+            }
         } catch (e: Exception) {
             promise.resolve(false)
         }
