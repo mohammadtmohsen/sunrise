@@ -13,9 +13,9 @@ import { updatePersistentNotification } from './persistentNotificationService';
 import { MAINTENANCE_NOTIFICATION_ID, STATUS_CHANNEL_ID } from '../utils/constants';
 
 /**
- * Schedule a silent daily maintenance alarm using SET_ALARM_CLOCK.
- * This is the most reliable timer on Android — it fires even in Doze mode
- * and is immune to battery optimization, unlike WorkManager/background fetch.
+ * Schedule a silent daily maintenance alarm using SET_EXACT_AND_ALLOW_WHILE_IDLE.
+ * Fires even in Doze mode. Uses exact-idle (not SET_ALARM_CLOCK) to avoid
+ * competing with real user alarms for the highest-priority alarm slot.
  *
  * Runs at ~2:30 AM daily to recalculate sun times and reschedule all alarms.
  */
@@ -57,7 +57,7 @@ export async function scheduleDailyMaintenance(): Promise<void> {
         type: TriggerType.TIMESTAMP,
         timestamp: next.getTime(),
         alarmManager: {
-          type: AlarmType.SET_ALARM_CLOCK,
+          type: AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE,
           allowWhileIdle: true,
         },
       },

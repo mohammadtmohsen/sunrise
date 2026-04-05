@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { AppState, Platform, type AppStateStatus } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { AppState, Platform, View, type AppStateStatus } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -33,6 +33,9 @@ import { COLORS } from '../src/utils/constants';
 export default function RootLayout() {
   const router = useRouter();
   const { location, fetchLocation } = useLocation();
+  // Gate rendering until we've checked for a pending alarm.
+  // This prevents the home screen from flashing before the alarm trigger screen.
+  const [isReady, setIsReady] = useState(false);
 
   useAppStateRecalculation();
   useRescheduleOnResume();
@@ -198,7 +201,7 @@ export default function RootLayout() {
           return true;
         }
 
-        router.push({
+        router.replace({
           pathname: '/alarm-trigger',
           params: { alarmId: pendingAlarmId },
         });
@@ -207,10 +210,15 @@ export default function RootLayout() {
       return false;
     }
 
-    // Check on mount (cold start)
+    // Check on mount (cold start) — run immediately, no delay
     async function checkInitialNotification() {
-      if (checkPendingAlarm()) return;
+      // Synchronous MMKV check first (instant)
+      if (checkPendingAlarm()) {
+        setIsReady(true);
+        return;
+      }
 
+      // Then check Notifee's initial notification (async, for tapped-to-open case)
       const initial = await notifee.getInitialNotification();
       if (initial) {
         const alarmId = initial.notification?.data?.alarmId as
@@ -218,12 +226,16 @@ export default function RootLayout() {
           | undefined;
         const isAlarm = initial.notification?.data?.type === 'alarm-trigger';
         if (alarmId && isAlarm) {
-          router.push({ pathname: '/alarm-trigger', params: { alarmId } });
+          const alarm = useAlarmStore.getState().alarms[alarmId];
+          if (alarm?.alarmStyle !== 'reminder') {
+            router.replace({ pathname: '/alarm-trigger', params: { alarmId } });
+          }
         }
       }
+      setIsReady(true);
     }
 
-    setTimeout(() => checkInitialNotification(), 300);
+    checkInitialNotification();
 
     // Check when app comes back to foreground
     const appStateSub = AppState.addEventListener(
@@ -247,6 +259,14 @@ export default function RootLayout() {
       clearInterval(pollInterval);
     };
   }, [router]);
+
+  // Show dark screen until we've checked for pending alarm —
+  // prevents home screen from flashing before alarm trigger
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0d0d1a' }} />
+    );
+  }
 
   return (
     <GestureHandlerRootView

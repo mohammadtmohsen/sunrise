@@ -359,10 +359,6 @@ export async function scheduleAlarm(
     );
 
     console.log('[scheduleAlarm] Scheduled:', alarm.id, 'at', triggerTime.toISOString());
-
-    // Schedule periodic refresh to keep expanded notification countdown fresh
-    await scheduleNotificationRefresh();
-
     return { success: true, notificationId, triggerTime };
   } catch (error) {
     console.error('[scheduleAlarm] Failed to create trigger notification:', error);
@@ -403,6 +399,9 @@ export async function scheduleAllAlarms(
       results[alarm.id] = await scheduleAlarm(alarm, sunTimes);
     }
   }
+
+  // Schedule periodic notification refresh once (not per-alarm)
+  await scheduleNotificationRefresh();
 
   return results;
 }
@@ -503,6 +502,9 @@ export async function scheduleSnooze(
  * Fires every 15 minutes to keep the expanded notification countdown fresh,
  * even when the app is killed. Each refresh re-schedules the next one,
  * creating a self-sustaining chain.
+ *
+ * Uses SET_EXACT_AND_ALLOW_WHILE_IDLE (not SET_ALARM_CLOCK) to avoid
+ * competing with real alarms for the highest-priority alarm slot.
  */
 export async function scheduleNotificationRefresh(): Promise<void> {
   if (Platform.OS !== 'android') return;
@@ -532,7 +534,7 @@ export async function scheduleNotificationRefresh(): Promise<void> {
         type: TriggerType.TIMESTAMP,
         timestamp: refreshAt,
         alarmManager: {
-          type: AlarmType.SET_ALARM_CLOCK,
+          type: AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE,
           allowWhileIdle: true,
         },
       },
