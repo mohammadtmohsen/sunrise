@@ -6,6 +6,7 @@ import {
   Dimensions,
   StyleSheet,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -39,7 +40,6 @@ import { updatePersistentNotification } from '../src/services/persistentNotifica
 import { formatTime } from '../src/utils/timeUtils';
 import { COLORS } from '../src/utils/constants';
 import { mmkv } from '../src/stores/storage';
-import { exitAndRemoveFromRecents } from '../src/services/notificationSubText';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DISMISS_THRESHOLD = -180;
@@ -129,7 +129,7 @@ export default function AlarmTriggerScreen() {
     }
     // Update notifications before exiting — finishAndRemoveTask kills the activity
     await updatePersistentNotification();
-    exitAndRemoveFromRecents();
+    setTimeout(() => BackHandler.exitApp(), 300);
   }, [alarmId]);
 
   const handleSnooze = useCallback(async () => {
@@ -144,7 +144,7 @@ export default function AlarmTriggerScreen() {
     }
     // Update notifications before exiting — finishAndRemoveTask kills the activity
     await updatePersistentNotification();
-    exitAndRemoveFromRecents();
+    setTimeout(() => BackHandler.exitApp(), 300);
   }, [alarm]);
 
   const panGesture = Gesture.Pan()

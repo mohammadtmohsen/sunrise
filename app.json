@@ -52,8 +52,7 @@
       "./plugins/withAlarmPermissions",
       "./plugins/withBootReceiver",
       "./plugins/withIOSAlarmPermissions",
-      "./plugins/withMMKVFix",
-      "./plugins/withNotificationSubText"
+      "./plugins/withMMKVFix"
     ],
     "extra": {
       "router": {},
