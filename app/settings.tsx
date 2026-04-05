@@ -28,10 +28,6 @@ import {
   updatePersistentNotification,
   cancelPersistentNotification,
 } from '../src/services/persistentNotificationService';
-import { scheduleAllAlarms } from '../src/services/alarmScheduler';
-import { useAlarmStore } from '../src/stores/alarmStore';
-import { useLocationStore } from '../src/stores/locationStore';
-import { getSunTimes, isSunTimesValid } from '../src/services/sunCalcService';
 import { COLORS } from '../src/utils/constants';
 
 function SettingsRow({
@@ -83,8 +79,6 @@ export default function SettingsScreen() {
     setDefaultSnoozeDuration,
     showPersistentNotification,
     setShowPersistentNotification,
-    forceAlarmEvents,
-    setForceAlarmEvents,
     customSoundUri,
     customSoundName,
     setCustomSound,
@@ -560,50 +554,6 @@ export default function SettingsScreen() {
                     updatePersistentNotification();
                   } else {
                     cancelPersistentNotification();
-                  }
-                }}
-                activeColor={COLORS.primary}
-              />
-            </View>
-            {/* Force alarm events */}
-            <View
-              style={{
-                backgroundColor: COLORS.surface,
-                padding: 16,
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderTopWidth: 1,
-                borderTopColor: COLORS.border,
-              }}
-            >
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={{ color: COLORS.textPrimary, fontSize: 16 }}>
-                  Force alarm events
-                </Text>
-                <Text
-                  style={{
-                    color: COLORS.textMuted,
-                    fontSize: 12,
-                    marginTop: 4,
-                  }}
-                >
-                  Improves alarm accuracy{'\n'}Note: The system will show an alarm icon in the status bar
-                </Text>
-              </View>
-              <AnimatedToggle
-                value={forceAlarmEvents}
-                onValueChange={async () => {
-                  const next = !forceAlarmEvents;
-                  setForceAlarmEvents(next);
-                  // Reschedule all alarms with the new alarm type
-                  const loc = useLocationStore.getState().location;
-                  const sun = loc ? getSunTimes(loc.latitude, loc.longitude) : null;
-                  if (!sun || isSunTimesValid(sun)) {
-                    const enabled = Object.values(useAlarmStore.getState().alarms).filter(a => a.isEnabled);
-                    if (enabled.length > 0) {
-                      await scheduleAllAlarms(enabled, sun);
-                    }
                   }
                 }}
                 activeColor={COLORS.primary}

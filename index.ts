@@ -2,7 +2,6 @@ import notifee, {
   EventType,
   AndroidImportance,
   AndroidVisibility,
-  AndroidStyle,
 } from '@notifee/react-native';
 import { AppRegistry, Linking, Platform } from 'react-native';
 import { dismissAlarm, scheduleSnooze } from './src/services/alarmScheduler';
@@ -10,11 +9,11 @@ import { scheduleAllAlarms } from './src/services/alarmScheduler';
 import { scheduleNextDayAlarm } from './src/services/nextDayScheduler';
 import { updatePersistentNotification } from './src/services/persistentNotificationService';
 import { getSunTimes } from './src/services/sunCalcService';
-import { playAlarmSound, playReminderSound, stopAlarmSound } from './src/services/soundService';
+import { playAlarmSound, stopAlarmSound } from './src/services/soundService';
 import { useAlarmStore } from './src/stores/alarmStore';
 import { useLocationStore } from './src/stores/locationStore';
 import { mmkv } from './src/stores/storage';
-import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID } from './src/utils/constants';
+import { ALARM_CHANNEL_ID, ALARM_GROUP_ID } from './src/utils/constants';
 import { runDailyMaintenance } from './src/services/maintenanceScheduler';
 
 // Register the standalone alarm screen component for Android full-screen intent.
@@ -32,6 +31,20 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
     if (type === EventType.DELIVERED) {
       await runDailyMaintenance();
       // Cancel the notification immediately — it's invisible housekeeping
+      if (detail.notification?.id) {
+        await notifee.cancelNotification(detail.notification.id);
+      }
+    }
+    return;
+  }
+
+  // Periodic notification refresh — keeps expanded countdown fresh every 15 min
+  if (detail.notification?.data?.type === 'notification-refresh') {
+    if (type === EventType.DELIVERED) {
+      await updatePersistentNotification();
+      // Re-schedule the next refresh to keep the chain going
+      const { scheduleNotificationRefresh } = require('./src/services/alarmScheduler');
+      await scheduleNotificationRefresh();
       if (detail.notification?.id) {
         await notifee.cancelNotification(detail.notification.id);
       }
@@ -66,6 +79,7 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
           await notifee.cancelNotification(detail.notification.id);
         }
         await scheduleNextDayAlarm(alarmId);
+        await updatePersistentNotification();
       } else {
         // Full alarm tapped — store for when app opens
         console.log('[BackgroundEvent] PRESS — storing pending alarm:', alarmId);
@@ -96,6 +110,7 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
       if (isReminder) {
         // Reminder swiped away — schedule next day
         await scheduleNextDayAlarm(alarmId);
+        await updatePersistentNotification();
       } else {
         await stopAlarmSound();
         await dismissAlarm(alarmId);
@@ -115,53 +130,7 @@ notifee.registerForegroundService((notification) => {
 
     const alarm = alarmId ? useAlarmStore.getState().alarms[alarmId] : null;
 
-    // Reminder with custom sound — play briefly, then create a persistent regular notification
-    if (alarm?.alarmStyle === 'reminder') {
-      console.log('[ForegroundService] Reminder — playing custom sound');
-
-      playReminderSound().catch((error) => {
-        console.error('[ForegroundService] Failed to play reminder sound:', error);
-      });
-
-      // After 15 seconds, stop sound and create a persistent regular notification
-      setTimeout(async () => {
-        await stopAlarmSound();
-
-        // Create a persistent notification that survives the service stopping
-        try {
-          await notifee.displayNotification({
-            id: `${alarmId}-persist`,
-            title: notification.title ?? alarm.name,
-            body: notification.body ?? '',
-            data: notification.data,
-            android: {
-              channelId: REMINDER_CHANNEL_ID,
-              importance: AndroidImportance.HIGH,
-              visibility: AndroidVisibility.PUBLIC,
-              autoCancel: false,
-              ongoing: false,
-              pressAction: { id: 'default' },
-              actions: [
-                { title: 'Dismiss', pressAction: { id: 'dismiss' } },
-              ],
-              style: {
-                type: AndroidStyle.BIGTEXT,
-                text: `${alarm.name}\n${notification.body ?? ''}`,
-              },
-            },
-          });
-        } catch (err) {
-          console.warn('[ForegroundService] Failed to create persist notification:', err);
-        }
-
-        // Update persistent notification so chronometer switches to next alarm
-        await updatePersistentNotification();
-
-        resolve();
-      }, 15000);
-      return;
-    }
-
+    // Only full alarms use the foreground service (reminders fire as regular notifications)
     if (alarmId) {
       mmkv.set('pending-alarm-id', alarmId);
     }
@@ -182,10 +151,12 @@ notifee.registerForegroundService((notification) => {
         data: notification.data,
         android: {
           channelId: ALARM_CHANNEL_ID,
+          groupId: ALARM_GROUP_ID,
           importance: AndroidImportance.HIGH,
           visibility: AndroidVisibility.PUBLIC,
           autoCancel: true,
           ongoing: false,
+          badgeCount: 0,
           sound: 'default',
           pressAction: { id: 'default' },
         },
@@ -195,9 +166,17 @@ notifee.registerForegroundService((notification) => {
     // Directly launch the app to foreground over lock screen.
     // This bypasses MIUI/OEM ROMs that block Android's fullScreenIntent API.
     // Uses the app's deep link scheme to call startActivity() directly.
+    // Include alarmId so the trigger screen can display the alarm name immediately.
     if (Platform.OS === 'android') {
+      // Store alarm name in MMKV as fallback for when the store isn't hydrated yet
+      if (alarmId && alarm?.name) {
+        mmkv.set('pending-alarm-name', alarm.name);
+      }
       setTimeout(() => {
-        Linking.openURL('lumora://alarm-trigger').catch((err) => {
+        const url = alarmId
+          ? `lumora://alarm-trigger?alarmId=${alarmId}`
+          : 'lumora://alarm-trigger';
+        Linking.openURL(url).catch((err) => {
           console.warn('[ForegroundService] Failed to launch app:', err);
         });
       }, 800);
@@ -243,9 +222,11 @@ AppRegistry.registerHeadlessTask('RESCHEDULE_ALARMS_ON_BOOT', () => async () => 
 
     await updatePersistentNotification();
 
-    // Ensure the daily maintenance alarm is scheduled after reboot
+    // Ensure the daily maintenance alarm and periodic refresh are scheduled after reboot
     const { scheduleDailyMaintenance: schedMaint } = require('./src/services/maintenanceScheduler');
     await schedMaint();
+    const { scheduleNotificationRefresh: schedRefresh } = require('./src/services/alarmScheduler');
+    await schedRefresh();
 
     console.log('[BootTask] Done — rescheduled', enabledAlarms.length, 'alarms');
   } catch (error) {

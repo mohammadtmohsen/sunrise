@@ -39,6 +39,7 @@ import { scheduleNextDayAlarm } from '../src/services/nextDayScheduler';
 import { updatePersistentNotification } from '../src/services/persistentNotificationService';
 import { formatTime } from '../src/utils/timeUtils';
 import { COLORS } from '../src/utils/constants';
+import { mmkv } from '../src/stores/storage';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DISMISS_THRESHOLD = -180;
@@ -62,8 +63,14 @@ function buildArc(w: number, _h: number, horizonY: number): string {
 
 export default function AlarmTriggerScreen() {
   const router = useRouter();
-  const { alarmId } = useLocalSearchParams<{ alarmId: string }>();
+  const params = useLocalSearchParams<{ alarmId: string }>();
+  // Use alarmId from URL params, or fall back to MMKV pending-alarm-id
+  // (covers deep links that arrive before pending alarm poll runs)
+  const alarmId = params.alarmId || mmkv.getString('pending-alarm-id') || undefined;
   const alarm = useAlarmStore((s) => (alarmId ? s.alarms[alarmId] : null));
+  // Fallback name from MMKV in case store isn't hydrated yet
+  const fallbackName = mmkv.getString('pending-alarm-name') || undefined;
+  const alarmName = alarm?.name ?? fallbackName ?? 'Alarm';
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const translateY = useSharedValue(0);
@@ -76,6 +83,10 @@ export default function AlarmTriggerScreen() {
 
   useEffect(() => {
     activateKeepAwakeAsync('alarm-trigger');
+
+    // Clear pending alarm keys now that the trigger screen is open
+    mmkv.delete('pending-alarm-id');
+    mmkv.delete('pending-alarm-name');
 
     async function setup() {
       if (Platform.OS === 'android' && alarmId) {
@@ -181,7 +192,7 @@ export default function AlarmTriggerScreen() {
       <Animated.View
         style={[styles.container, containerStyle]}
         accessibilityRole="alert"
-        accessibilityLabel={`Alarm: ${alarm?.name ?? 'Alarm'}. Swipe up to dismiss.`}
+        accessibilityLabel={`Alarm: ${alarmName}. Swipe up to dismiss.`}
       >
         {/* Arc illustration */}
         <View style={styles.arcArea}>
@@ -247,7 +258,7 @@ export default function AlarmTriggerScreen() {
 
         {/* Alarm name */}
         <Text style={[styles.name, { color: eventColor }]}>
-          {alarm?.name ?? 'Alarm'}
+          {alarmName}
         </Text>
 
         {/* Spacer */}

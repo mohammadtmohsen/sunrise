@@ -21,3 +21,9 @@ export const REMINDER_CHANNEL_ID = 'reminder-channel-v2';
 export const STATUS_CHANNEL_ID = 'status-channel-v2';
 export const STATUS_NOTIFICATION_ID = 'persistent-status';
 export const MAINTENANCE_NOTIFICATION_ID = 'daily-maintenance';
+export const REFRESH_NOTIFICATION_ID = 'notification-refresh';
+
+// Notification group IDs — keep persistent status and alarm/reminder
+// notifications in separate groups so Android doesn't auto-bundle them.
+export const STATUS_GROUP_ID = 'lumora-status';
+export const ALARM_GROUP_ID = 'lumora-alarms';

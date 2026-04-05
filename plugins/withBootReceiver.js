@@ -17,7 +17,9 @@ class BootAlarmReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
             intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED ||
             intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
-            intent.action == "com.htc.intent.action.QUICKBOOT_POWERON"
+            intent.action == "com.htc.intent.action.QUICKBOOT_POWERON" ||
+            intent.action == Intent.ACTION_TIME_CHANGED ||
+            intent.action == Intent.ACTION_TIMEZONE_CHANGED
         ) {
             try {
                 // Acquire wake lock before returning from onReceive to prevent
@@ -114,6 +116,8 @@ function withBootReceiver(config) {
               { $: { 'android:name': 'android.intent.action.LOCKED_BOOT_COMPLETED' } },
               { $: { 'android:name': 'android.intent.action.QUICKBOOT_POWERON' } },
               { $: { 'android:name': 'com.htc.intent.action.QUICKBOOT_POWERON' } },
+              { $: { 'android:name': 'android.intent.action.TIME_SET' } },
+              { $: { 'android:name': 'android.intent.action.TIMEZONE_CHANGED' } },
             ],
           },
         ],

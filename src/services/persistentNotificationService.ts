@@ -1,15 +1,17 @@
 import notifee, {
   AndroidImportance,
-  AndroidStyle,
 } from '@notifee/react-native';
 import { Platform } from 'react-native';
 import { useAlarmStore } from '../stores/alarmStore';
 import { useLocationStore } from '../stores/locationStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getSunTimes, isSunTimesValid } from './sunCalcService';
-import { STATUS_CHANNEL_ID, STATUS_NOTIFICATION_ID } from '../utils/constants';
+import { STATUS_CHANNEL_ID, STATUS_NOTIFICATION_ID, STATUS_GROUP_ID } from '../utils/constants';
 import { formatTime } from '../utils/timeUtils';
 import type { Alarm, SunTimes } from '../models/types';
+
+/** Prefix for per-alarm child notification IDs */
+const CHILD_PREFIX = 'status-alarm-';
 
 /**
  * Get all enabled alarms sorted by next trigger time (soonest first).
@@ -23,22 +25,6 @@ function getFutureAlarms(alarms: Record<string, Alarm>): Alarm[] {
 }
 
 /**
- * Format a relative time string like "in 2h 14m" or "in 37m".
- */
-function formatRelativeTime(triggerAt: number): string {
-  const diff = triggerAt - Date.now();
-  if (diff <= 0) return 'now';
-  const days = Math.floor(diff / (24 * 60 * 60 * 1000));
-  const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
-  const minutes = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0) parts.push(`${minutes}m`);
-  return `in ${parts.join(' ') || '0m'}`;
-}
-
-/**
  * Build the sun times line: "Sunrise 06:23  ·  Sunset 19:45"
  */
 function buildSunLine(sunTimes: SunTimes): string {
@@ -46,30 +32,33 @@ function buildSunLine(sunTimes: SunTimes): string {
 }
 
 /**
- * Build InboxStyle lines listing all registered alarms with relative times.
- * Android InboxStyle supports ~5-7 visible lines when expanded.
+ * Remove stale child notifications for alarms that are no longer active.
  */
-function buildAlarmLines(futureAlarms: Alarm[]): string[] {
-  return futureAlarms.map(a => {
-    const triggerDate = new Date(a.nextTriggerAt!);
-    const triggerMs = triggerDate.getTime();
-    const relative = formatRelativeTime(triggerMs);
-    const style = a.alarmStyle === 'reminder' ? '🔔' : '⏰';
-    const repeat = (a.repeatMode ?? 'once') === 'repeat' ? '∞' : '①';
-    return `${style}  ${a.name}  ·  ${formatTime(triggerDate)}  (${relative})  ${repeat}`;
-  });
+async function cleanupStaleChildren(activeAlarmIds: Set<string>): Promise<void> {
+  try {
+    const displayed = await notifee.getDisplayedNotifications();
+    for (const n of displayed) {
+      if (n.id?.startsWith(CHILD_PREFIX)) {
+        const alarmId = n.id.slice(CHILD_PREFIX.length);
+        if (!activeAlarmIds.has(alarmId)) {
+          await notifee.cancelNotification(n.id);
+        }
+      }
+    }
+  } catch {
+    // May fail if notifications can't be queried
+  }
 }
 
 /**
- * Update or create the persistent status notification.
+ * Update or create the persistent status notifications.
  *
- * Collapsed view:
- *   Title:  "Wake up lumors · 05:53"     (alarm name + trigger time)
- *   Body:   "Sunrise 06:23 · Sunset 19:45"
- *   Right:  native countdown timer (live, ticking) — only when next alarm is in the future
+ * Uses a notification group with:
+ *   - A summary notification (collapsed: next alarm + sun times)
+ *   - One child notification per alarm, each with its own LIVE chronometer
  *
- * Expanded view (InboxStyle):
- *   Lists all registered alarms/reminders with their trigger times and relative countdown.
+ * When collapsed: shows the summary with the next alarm's countdown.
+ * When expanded: shows each alarm as a separate row with its own ticking countdown.
  *
  * Should be called whenever alarms, sun times, or settings change.
  * No-op on iOS (iOS does not support ongoing notifications).
@@ -98,6 +87,7 @@ export async function updatePersistentNotification(): Promise<void> {
       }
     }
 
+    // --- Summary (group parent) notification ---
     let title: string;
     let body: string;
     let showChronometer = false;
@@ -106,41 +96,33 @@ export async function updatePersistentNotification(): Promise<void> {
     if (nextAlarm && nextAlarm.nextTriggerAt) {
       const triggerDate = new Date(nextAlarm.nextTriggerAt);
       const triggerAt = triggerDate.getTime();
-
-      // Title: alarm name + exact trigger time + repeat icon
       const repeatIcon = (nextAlarm.repeatMode ?? 'once') === 'repeat' ? '∞' : '①';
       title = `${nextAlarm.name}  ·  ${formatTime(triggerDate)}  ${repeatIcon}`;
+      body = sunTimes ? buildSunLine(sunTimes) : 'Location not set';
 
-      // Body: sunrise + sunset
-      body = sunTimes
-        ? buildSunLine(sunTimes)
-        : 'Location not set';
-
-      // Only show chronometer if the trigger time is still in the future
-      // This prevents the countdown from going negative
       if (triggerAt > Date.now()) {
         showChronometer = true;
         timestamp = triggerAt;
       }
     } else {
-      // No active alarms — show sun times as title
       title = sunTimes ? buildSunLine(sunTimes) : 'Lumora';
       body = 'No active alarms';
     }
 
-    // Build expanded view with all alarms
-    const alarmLines = buildAlarmLines(futureAlarms);
-
+    // Display the group summary notification
     await notifee.displayNotification({
       id: STATUS_NOTIFICATION_ID,
       title,
       body,
       android: {
         channelId: STATUS_CHANNEL_ID,
+        groupId: STATUS_GROUP_ID,
+        groupSummary: true,
         ongoing: true,
         autoCancel: false,
         onlyAlertOnce: true,
         importance: AndroidImportance.LOW,
+        badgeCount: 0,
         smallIcon: 'ic_launcher',
         showChronometer,
         chronometerDirection: 'down',
@@ -149,33 +131,70 @@ export async function updatePersistentNotification(): Promise<void> {
           id: 'default',
           launchActivity: 'default',
         },
-        style: alarmLines.length > 0
-          ? {
-              type: AndroidStyle.INBOX,
-              lines: alarmLines,
-              title: nextAlarm ? nextAlarm.name : 'Lumora',
-            }
-          : {
-              type: AndroidStyle.BIGTEXT,
-              text: sunTimes
-                ? `Sunrise: ${formatTime(sunTimes.sunrise)}  ·  Sunset: ${formatTime(sunTimes.sunset)}\nNo active alarms`
-                : 'No active alarms',
-            },
       },
     });
+
+    // --- Per-alarm child notifications (each with its own live chronometer) ---
+    const activeIds = new Set<string>();
+
+    for (const alarm of futureAlarms) {
+      const triggerDate = new Date(alarm.nextTriggerAt!);
+      const triggerAt = triggerDate.getTime();
+      const childId = `${CHILD_PREFIX}${alarm.id}`;
+      activeIds.add(alarm.id);
+
+      const style = alarm.alarmStyle === 'reminder' ? '🔔' : '⏰';
+      const repeat = (alarm.repeatMode ?? 'once') === 'repeat' ? '∞' : '①';
+
+      await notifee.displayNotification({
+        id: childId,
+        title: `${style}  ${alarm.name}  ${repeat}`,
+        body: `${formatTime(triggerDate)}`,
+        android: {
+          channelId: STATUS_CHANNEL_ID,
+          groupId: STATUS_GROUP_ID,
+          groupSummary: false,
+          ongoing: true,
+          autoCancel: false,
+          onlyAlertOnce: true,
+          importance: AndroidImportance.LOW,
+          badgeCount: 0,
+          smallIcon: 'ic_launcher',
+          showChronometer: triggerAt > Date.now(),
+          chronometerDirection: 'down',
+          timestamp: triggerAt > Date.now() ? triggerAt : undefined,
+          pressAction: {
+            id: 'default',
+            launchActivity: 'default',
+          },
+        },
+      });
+    }
+
+    // Remove child notifications for alarms that no longer exist or are past
+    await cleanupStaleChildren(activeIds);
   } catch (e) {
     console.warn('Failed to update persistent notification:', e);
   }
 }
 
 /**
- * Remove the persistent status notification.
+ * Remove all persistent status notifications (summary + children).
  */
 export async function cancelPersistentNotification(): Promise<void> {
   if (Platform.OS !== 'android') return;
 
   try {
+    // Cancel the summary
     await notifee.cancelNotification(STATUS_NOTIFICATION_ID);
+
+    // Cancel all child notifications
+    const displayed = await notifee.getDisplayedNotifications();
+    for (const n of displayed) {
+      if (n.id?.startsWith(CHILD_PREFIX)) {
+        await notifee.cancelNotification(n.id);
+      }
+    }
   } catch {
     // May not exist
   }

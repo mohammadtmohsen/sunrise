@@ -19,20 +19,7 @@ import {
   formatOffset,
   formatRepeatDays,
 } from '../utils/timeUtils';
-import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID } from '../utils/constants';
-import { useSettingsStore } from '../stores/settingsStore';
-
-/**
- * Get the alarm manager type based on the forceAlarmEvents setting.
- * SET_ALARM_CLOCK: most reliable, shows alarm icon in status bar.
- * SET_EXACT_AND_ALLOW_WHILE_IDLE: still fires in Doze, no status bar icon.
- */
-function getAlarmManagerType(): AlarmType {
-  const { forceAlarmEvents } = useSettingsStore.getState();
-  return forceAlarmEvents
-    ? AlarmType.SET_ALARM_CLOCK
-    : AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE;
-}
+import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID, STATUS_CHANNEL_ID, REFRESH_NOTIFICATION_ID, ALARM_GROUP_ID } from '../utils/constants';
 
 /**
  * Ensure Android exact alarm permission is granted.
@@ -275,6 +262,7 @@ export async function scheduleAlarm(
         android: isReminder
           ? {
               channelId: REMINDER_CHANNEL_ID,
+              groupId: ALARM_GROUP_ID,
               importance: AndroidImportance.HIGH,
               visibility: AndroidVisibility.PUBLIC,
               sound: 'default',
@@ -282,6 +270,7 @@ export async function scheduleAlarm(
               lightUpScreen: true,
               autoCancel: false,
               ongoing: false,
+              badgeCount: 0,
               pressAction: { id: 'default' },
               actions: [
                 {
@@ -296,6 +285,7 @@ export async function scheduleAlarm(
             }
           : {
               channelId: ALARM_CHANNEL_ID,
+              groupId: ALARM_GROUP_ID,
               category: AndroidCategory.ALARM,
               importance: AndroidImportance.HIGH,
               visibility: AndroidVisibility.PUBLIC,
@@ -360,13 +350,19 @@ export async function scheduleAlarm(
         type: TriggerType.TIMESTAMP,
         timestamp: triggerTime.getTime(),
         alarmManager: {
-          type: getAlarmManagerType(),
+          // SET_ALARM_CLOCK is the most reliable alarm type on Android —
+          // immune to Doze mode and battery optimization. Always use it.
+          type: AlarmType.SET_ALARM_CLOCK,
           allowWhileIdle: true,
         },
       },
     );
 
     console.log('[scheduleAlarm] Scheduled:', alarm.id, 'at', triggerTime.toISOString());
+
+    // Schedule periodic refresh to keep expanded notification countdown fresh
+    await scheduleNotificationRefresh();
+
     return { success: true, notificationId, triggerTime };
   } catch (error) {
     console.error('[scheduleAlarm] Failed to create trigger notification:', error);
@@ -378,7 +374,7 @@ export async function scheduleAlarm(
  * Cancel a scheduled alarm notification and any active snooze.
  */
 export async function cancelAlarm(alarm: Alarm): Promise<void> {
-  const ids = [alarm.id, `${alarm.id}-snooze`, `${alarm.id}-persist`, `${alarm.id}-watch`];
+  const ids = [alarm.id, `${alarm.id}-snooze`, `${alarm.id}-persist`, `${alarm.id}-watch`, `status-alarm-${alarm.id}`];
   for (const id of ids) {
     try {
       await notifee.cancelNotification(id);
@@ -442,6 +438,7 @@ export async function scheduleSnooze(
       },
       android: {
         channelId: ALARM_CHANNEL_ID,
+        groupId: ALARM_GROUP_ID,
         category: AndroidCategory.ALARM,
         importance: AndroidImportance.HIGH,
         visibility: AndroidVisibility.PUBLIC,
@@ -450,6 +447,7 @@ export async function scheduleSnooze(
         lightUpScreen: true,
         autoCancel: false,
         ongoing: true,
+        badgeCount: 0,
         asForegroundService: true,
         fullScreenAction: {
           id: 'default',
@@ -491,7 +489,7 @@ export async function scheduleSnooze(
       type: TriggerType.TIMESTAMP,
       timestamp: snoozeTime,
       alarmManager: {
-        type: getAlarmManagerType(),
+        type: AlarmType.SET_ALARM_CLOCK,
         allowWhileIdle: true,
       },
     },
@@ -501,10 +499,54 @@ export async function scheduleSnooze(
 }
 
 /**
+ * Schedule the next periodic notification refresh.
+ * Fires every 15 minutes to keep the expanded notification countdown fresh,
+ * even when the app is killed. Each refresh re-schedules the next one,
+ * creating a self-sustaining chain.
+ */
+export async function scheduleNotificationRefresh(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  const refreshAt = Date.now() + 15 * 60 * 1000; // 15 minutes from now
+
+  try {
+    await notifee.cancelTriggerNotification(REFRESH_NOTIFICATION_ID);
+    await notifee.createTriggerNotification(
+      {
+        id: REFRESH_NOTIFICATION_ID,
+        title: 'Updating alarm status',
+        body: '',
+        data: { type: 'notification-refresh' },
+        android: {
+          channelId: STATUS_CHANNEL_ID,
+          importance: AndroidImportance.LOW,
+          visibility: AndroidVisibility.SECRET,
+          sound: undefined,
+          autoCancel: true,
+          ongoing: false,
+          asForegroundService: false,
+          pressAction: { id: 'default' },
+        },
+      },
+      {
+        type: TriggerType.TIMESTAMP,
+        timestamp: refreshAt,
+        alarmManager: {
+          type: AlarmType.SET_ALARM_CLOCK,
+          allowWhileIdle: true,
+        },
+      },
+    );
+  } catch (e) {
+    console.warn('[scheduleNotificationRefresh] Failed:', e);
+  }
+}
+
+/**
  * Dismiss an active alarm — cancel notification + stop foreground service.
  */
 export async function dismissAlarm(alarmId: string): Promise<void> {
-  const ids = [alarmId, `${alarmId}-snooze`, `${alarmId}-persist`, `${alarmId}-watch`];
+  const ids = [alarmId, `${alarmId}-snooze`, `${alarmId}-persist`, `${alarmId}-watch`, `status-alarm-${alarmId}`];
   for (const id of ids) {
     try {
       await notifee.cancelNotification(id);

@@ -14,12 +14,12 @@ import {
   setupStatusNotificationChannel,
   requestNotificationPermission,
   setupIOSCategories,
+  checkBatteryOptimization,
 } from '../src/services/notificationService';
-import { scheduleAllAlarms } from '../src/services/alarmScheduler';
+import { scheduleAllAlarms, promptFullScreenIntentPermission, dismissAlarm, scheduleSnooze, scheduleNotificationRefresh } from '../src/services/alarmScheduler';
 import { getSunTimes, isSunTimesValid } from '../src/services/sunCalcService';
 
 import { updatePersistentNotification } from '../src/services/persistentNotificationService';
-import { dismissAlarm, scheduleSnooze } from '../src/services/alarmScheduler';
 import { stopAlarmSound } from '../src/services/soundService';
 import { scheduleNextDayAlarm } from '../src/services/nextDayScheduler';
 import { useAppStateRecalculation } from '../src/hooks/useAppStateRecalculation';
@@ -54,6 +54,26 @@ export default function RootLayout() {
       await setupIOSCategories();
       await registerBackgroundRecalculation();
       await scheduleDailyMaintenance();
+      await scheduleNotificationRefresh();
+      // On first launch or when battery optimization is enabled, request exemption.
+      // Battery-optimized apps get killed by Android, preventing alarms from firing.
+      if (Platform.OS === 'android') {
+        const batteryInfo = await checkBatteryOptimization();
+        if (batteryInfo.isOptimized) {
+          try {
+            await notifee.openBatteryOptimizationSettings();
+          } catch {
+            // Settings may not be available on all OEMs
+          }
+        }
+      }
+
+      // On first launch, prompt for Xiaomi/OEM-specific permissions
+      const hasCompleted = useSettingsStore.getState().hasCompletedOnboarding;
+      if (!hasCompleted && Platform.OS === 'android') {
+        await promptFullScreenIntentPermission();
+      }
+
       useSettingsStore.getState().setOnboardingComplete();
 
       // Re-register all enabled alarms with AlarmManager on every app open.

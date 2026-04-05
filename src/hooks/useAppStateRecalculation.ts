@@ -20,8 +20,12 @@ export function useAppStateRecalculation() {
     const handleAppStateChange = async (nextState: AppStateStatus) => {
       if (nextState !== 'active') return;
 
+      // Always update persistent notification on resume — clears stale
+      // chronometer, refreshes alarm list, and corrects badge count
+      await updatePersistentNotification();
+
       const today = getTodayDateString();
-      // Only recalculate if the date has changed since last calculation
+      // Only recalculate sun times if the date has changed since last calculation
       if (lastRecalcDate.current === today) return;
       lastRecalcDate.current = today;
 
