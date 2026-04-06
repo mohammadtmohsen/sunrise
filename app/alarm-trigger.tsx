@@ -34,9 +34,7 @@ import notifee from '@notifee/react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useAlarmStore } from '../src/stores/alarmStore';
 import { playAlarmSound, stopAlarmSound } from '../src/services/soundService';
-import { dismissAlarm, scheduleSnooze } from '../src/services/alarmScheduler';
-import { scheduleNextDayAlarm } from '../src/services/nextDayScheduler';
-import { updatePersistentNotification } from '../src/services/persistentNotificationService';
+import { handleSnooze, handleDismiss } from '../src/services/alarmEventHandler';
 import { formatTime } from '../src/utils/timeUtils';
 import { COLORS } from '../src/utils/constants';
 import { mmkv } from '../src/stores/storage';
@@ -119,33 +117,19 @@ export default function AlarmTriggerScreen() {
     );
   }, []);
 
-  const handleDismiss = useCallback(async () => {
-    // Stop everything — foreground service, sound, vibration
-    try { await notifee.stopForegroundService(); } catch {}
-    await stopAlarmSound();
+  const onDismiss = useCallback(async () => {
     if (alarmId) {
-      await dismissAlarm(alarmId);
-      await scheduleNextDayAlarm(alarmId);
+      await handleDismiss(alarmId);
     }
-    // Update notifications before exiting — finishAndRemoveTask kills the activity
-    await updatePersistentNotification();
     setTimeout(() => BackHandler.exitApp(), 300);
   }, [alarmId]);
 
-  const handleSnooze = useCallback(async () => {
-    try { await notifee.stopForegroundService(); } catch {}
-    await stopAlarmSound();
-    if (alarm) {
-      await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
-      const snoozeAt = new Date(Date.now() + alarm.snoozeDurationMinutes * 60 * 1000);
-      useAlarmStore.getState().updateAlarm(alarm.id, {
-        nextTriggerAt: snoozeAt.toISOString(),
-      });
+  const onSnooze = useCallback(async () => {
+    if (alarmId) {
+      await handleSnooze(alarmId);
     }
-    // Update notifications before exiting — finishAndRemoveTask kills the activity
-    await updatePersistentNotification();
     setTimeout(() => BackHandler.exitApp(), 300);
-  }, [alarm]);
+  }, [alarmId]);
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
@@ -156,7 +140,7 @@ export default function AlarmTriggerScreen() {
     .onEnd((event) => {
       if (event.translationY < DISMISS_THRESHOLD) {
         translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 300 });
-        runOnJS(handleDismiss)();
+        runOnJS(onDismiss)();
       } else {
         translateY.value = withSpring(0);
       }
@@ -260,7 +244,7 @@ export default function AlarmTriggerScreen() {
 
         {/* Snooze */}
         <Pressable
-          onPress={handleSnooze}
+          onPress={onSnooze}
           style={({ pressed }) => [
             styles.snoozeButton,
             { backgroundColor: pressed ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)' },

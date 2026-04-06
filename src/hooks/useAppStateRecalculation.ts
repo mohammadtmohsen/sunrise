@@ -3,15 +3,19 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { useAlarmStore } from '../stores/alarmStore';
 import { useLocationStore } from '../stores/locationStore';
 import { getSunTimes, isSunTimesValid } from '../services/sunCalcService';
-import { scheduleAllAlarms } from '../services/alarmScheduler';
+import { scheduleAlarm, scheduleAllAlarms } from '../services/alarmScheduler';
 import { updatePersistentNotification } from '../services/persistentNotificationService';
 import { getTodayDateString } from '../utils/timeUtils';
 
 /**
- * Second leg of triple-redundancy: recalculate alarms when app comes to foreground.
+ * Combined AppState handler for alarm recalculation and rescheduling.
  *
- * Checks if the cached sun times are stale (different date) and, if so,
- * recalculates trigger times and reschedules all enabled alarms.
+ * On every resume:
+ *  1. Update persistent notification (clear stale chronometer)
+ *  2. If date changed, recalculate sun times and reschedule all alarms
+ *  3. Retry any enabled alarms that failed to schedule (e.g. permission was missing)
+ *
+ * Uses a single AppState listener to avoid duplicate work.
  */
 export function useAppStateRecalculation() {
   const lastRecalcDate = useRef<string>(getTodayDateString());
@@ -20,40 +24,52 @@ export function useAppStateRecalculation() {
     const handleAppStateChange = async (nextState: AppStateStatus) => {
       if (nextState !== 'active') return;
 
-      // Always update persistent notification on resume — clears stale
-      // chronometer, refreshes alarm list, and corrects badge count
-      await updatePersistentNotification();
-
-      const today = getTodayDateString();
-      // Only recalculate sun times if the date has changed since last calculation
-      if (lastRecalcDate.current === today) return;
-      lastRecalcDate.current = today;
-
       const location = useLocationStore.getState().location;
-      if (!location) return;
+      const sunTimes = location
+        ? getSunTimes(location.latitude, location.longitude)
+        : null;
 
-      const sunTimes = getSunTimes(location.latitude, location.longitude);
-      if (!isSunTimesValid(sunTimes)) return;
+      // --- Date-change recalculation ---
+      const today = getTodayDateString();
+      if (lastRecalcDate.current !== today) {
+        lastRecalcDate.current = today;
 
-      // Update store trigger times
-      useAlarmStore.getState().recalculateAllTriggerTimes(sunTimes);
+        if (sunTimes && isSunTimesValid(sunTimes)) {
+          useAlarmStore.getState().recalculateAllTriggerTimes(sunTimes);
 
-      // Reschedule all enabled alarms
-      const enabledAlarms = Object.values(
-        useAlarmStore.getState().alarms,
-      ).filter((a) => a.isEnabled);
+          const enabledAlarms = Object.values(
+            useAlarmStore.getState().alarms,
+          ).filter((a) => a.isEnabled);
 
-      if (enabledAlarms.length > 0) {
-        await scheduleAllAlarms(enabledAlarms, sunTimes);
+          if (enabledAlarms.length > 0) {
+            await scheduleAllAlarms(enabledAlarms, sunTimes);
+          }
+        }
       }
 
+      // --- Retry unscheduled alarms ---
+      const alarms = useAlarmStore.getState().alarms;
+      const unscheduled = Object.values(alarms).filter(
+        (a) => a.isEnabled && !a.notificationId,
+      );
+
+      if (unscheduled.length > 0 && (!sunTimes || isSunTimesValid(sunTimes))) {
+        for (const alarm of unscheduled) {
+          const result = await scheduleAlarm(alarm, sunTimes);
+          if (result.success) {
+            useAlarmStore.getState().updateAlarm(alarm.id, {
+              notificationId: result.notificationId,
+              nextTriggerAt: result.triggerTime.toISOString(),
+            });
+          }
+        }
+      }
+
+      // Single persistent notification update at the end
       await updatePersistentNotification();
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-
-    return () => {
-      subscription.remove();
-    };
+    return () => subscription.remove();
   }, []);
 }

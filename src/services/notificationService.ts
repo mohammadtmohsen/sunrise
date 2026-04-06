@@ -2,9 +2,8 @@ import notifee, {
   AndroidImportance,
   AndroidVisibility,
   AuthorizationStatus,
-  IOSNotificationSetting,
 } from '@notifee/react-native';
-import { Platform, Linking } from 'react-native';
+import { Platform } from 'react-native';
 import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID, STATUS_CHANNEL_ID } from '../utils/constants';
 
 /**
@@ -104,86 +103,17 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
 }
 
-/**
- * Check current notification permission status.
- */
-export async function checkNotificationPermission(): Promise<boolean> {
-  const settings = await notifee.getNotificationSettings();
-  return settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
-}
-
-/**
- * Check if Critical Alerts are enabled on iOS.
- * Returns true on Android (not applicable).
- */
-export async function checkCriticalAlertsPermission(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return true;
-
-  const settings = await notifee.getNotificationSettings();
-  return settings.ios?.criticalAlert === IOSNotificationSetting.ENABLED;
-}
-
-/**
- * Check Android battery optimization status.
- */
-export async function checkBatteryOptimization(): Promise<{
-  isOptimized: boolean;
-  hasPowerManager: boolean;
-}> {
-  if (Platform.OS !== 'android') {
-    return { isOptimized: false, hasPowerManager: false };
-  }
-
-  const isOptimized = await notifee.isBatteryOptimizationEnabled();
-  const powerInfo = await notifee.getPowerManagerInfo();
-
-  return {
-    isOptimized,
-    hasPowerManager: powerInfo.activity !== null,
-  };
-}
-
-export async function openBatterySettings(): Promise<void> {
-  await notifee.openBatteryOptimizationSettings();
-}
-
-export async function openPowerManagerSettings(): Promise<void> {
-  await notifee.openPowerManagerSettings();
-}
-
-export async function openAlarmPermissionSettings(): Promise<void> {
-  await notifee.openAlarmPermissionSettings();
-}
-
-/**
- * Check if full-screen intent permission is granted (Android 14+).
- * Required for the alarm to show a full-screen UI over the lock screen.
- */
-/**
- * Check if full-screen intent permission is likely needed.
- * On Android 14+ (API 34), USE_FULL_SCREEN_INTENT must be explicitly granted.
- */
-export function needsFullScreenIntentPermission(): boolean {
-  if (Platform.OS !== 'android') return false;
-  return Platform.Version >= 34;
-}
-
-/**
- * Open the system settings page where users can enable full-screen intent permission.
- * Required on Android 14+ for the alarm to show over the lock screen.
- */
-export async function openFullScreenIntentSettings(): Promise<void> {
-  if (Platform.OS !== 'android') return;
-  try {
-    await Linking.sendIntent(
-      'android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT',
-      [{ key: 'package', value: 'com.lumora.app' }],
-    );
-  } catch {
-    // Fallback to app notification settings if the intent isn't available
-    await notifee.openNotificationSettings();
-  }
-}
+// Re-export permission functions for backwards compatibility
+export {
+  checkNotificationPermission,
+  checkCriticalAlertsPermission,
+  checkBatteryOptimization,
+  openBatterySettings,
+  openPowerManagerSettings,
+  openAlarmPermissionSettings,
+  needsFullScreenIntentPermission,
+  openFullScreenIntentSettings,
+} from './permissionService';
 
 /**
  * Set up iOS notification categories with Dismiss and Snooze actions.

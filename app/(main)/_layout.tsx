@@ -43,7 +43,7 @@ export default function MainLayout() {
             >
               {!isHome && !isAlarmForm && (
                 <View style={{ paddingBottom: 8 }}>
-                  <SunTimesDisplay sunTimes={todaySunTimes} isValid={isValid} isRefreshing={isLoading} />
+                  <SunTimesDisplay sunTimes={todaySunTimes} isValid={isValid} />
                 </View>
               )}
             </AppHeader>

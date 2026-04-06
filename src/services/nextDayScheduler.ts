@@ -2,7 +2,6 @@ import { useAlarmStore } from '../stores/alarmStore';
 import { useLocationStore } from '../stores/locationStore';
 import { getTomorrowSunTimes, isSunTimesValid } from './sunCalcService';
 import { scheduleAlarm } from './alarmScheduler';
-import { updatePersistentNotification } from './persistentNotificationService';
 
 /**
  * Third leg of triple-redundancy: when an alarm is dismissed,
@@ -22,7 +21,6 @@ export async function scheduleNextDayAlarm(alarmId: string): Promise<void> {
       nextTriggerAt: null,
       notificationId: null,
     });
-    await updatePersistentNotification();
     return;
   }
 
@@ -37,7 +35,6 @@ export async function scheduleNextDayAlarm(alarmId: string): Promise<void> {
       // Clear stale notificationId so useRescheduleOnResume can retry
       useAlarmStore.getState().updateAlarm(alarmId, { notificationId: null });
     }
-    await updatePersistentNotification();
     return;
   }
 
@@ -62,5 +59,4 @@ export async function scheduleNextDayAlarm(alarmId: string): Promise<void> {
     // Clear stale notificationId so useRescheduleOnResume can retry
     useAlarmStore.getState().updateAlarm(alarmId, { notificationId: null });
   }
-  await updatePersistentNotification();
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,21 +9,17 @@ import {
   Linking,
 } from 'react-native';
 import { AnimatedToggle } from '../src/components/AlarmCard';
-import { pickAudioFile, deleteCustomSound } from '../src/services/audioPickerService';
-import { playPreviewSound, stopPreviewSound } from '../src/services/soundService';
 import { useLocation } from '../src/hooks/useLocation';
 import { useSettingsStore } from '../src/stores/settingsStore';
+import { usePermissionStatus } from '../src/hooks/usePermissionStatus';
+import { useSoundPicker } from '../src/hooks/useSoundPicker';
 import {
-  checkNotificationPermission,
-  requestNotificationPermission,
-  checkCriticalAlertsPermission,
-  checkBatteryOptimization,
   openBatterySettings,
   openPowerManagerSettings,
   openAlarmPermissionSettings,
   needsFullScreenIntentPermission,
   openFullScreenIntentSettings,
-} from '../src/services/notificationService';
+} from '../src/services/permissionService';
 import {
   updatePersistentNotification,
   cancelPersistentNotification,
@@ -79,131 +75,25 @@ export default function SettingsScreen() {
     setDefaultSnoozeDuration,
     showPersistentNotification,
     setShowPersistentNotification,
-    customSoundUri,
-    customSoundName,
-    setCustomSound,
-    clearCustomSound,
-    customReminderSoundUri,
-    customReminderSoundName,
-    setCustomReminderSound,
-    clearCustomReminderSound,
   } = useSettingsStore();
 
-  const [isPreviewing, setIsPreviewing] = useState(false);
-  const [isPreviewingReminder, setIsPreviewingReminder] = useState(false);
-  const [notifPermission, setNotifPermission] = useState<boolean | null>(null);
-  const [criticalAlerts, setCriticalAlerts] = useState<boolean | null>(null);
-  const [batteryInfo, setBatteryInfo] = useState<{
-    isOptimized: boolean;
-    hasPowerManager: boolean;
-  } | null>(null);
+  const { notifPermission, criticalAlerts, batteryInfo, handleNotifPermission } =
+    usePermissionStatus();
 
-  useEffect(() => {
-    async function checkPermissions() {
-      const granted = await checkNotificationPermission();
-      setNotifPermission(granted);
-
-      if (Platform.OS === 'android') {
-        const info = await checkBatteryOptimization();
-        setBatteryInfo(info);
-      }
-
-      if (Platform.OS === 'ios') {
-        const critical = await checkCriticalAlertsPermission();
-        setCriticalAlerts(critical);
-      }
-    }
-    checkPermissions();
-  }, []);
-
-  const handleNotifPermission = async () => {
-    const granted = await requestNotificationPermission();
-    setNotifPermission(granted);
-    if (!granted) {
-      Alert.alert(
-        'Notifications Required',
-        'Please enable notifications in your device settings to use alarms.',
-      );
-    }
-  };
-
-  const handlePickSound = useCallback(async () => {
-    try {
-      const result = await pickAudioFile();
-      if (result) {
-        if (customSoundUri) {
-          await deleteCustomSound(customSoundUri);
-        }
-        setCustomSound(result.uri, result.name);
-      }
-    } catch {
-      Alert.alert('Error', 'Failed to select audio file. Please try again.');
-    }
-  }, [customSoundUri, setCustomSound]);
-
-  const handlePreview = useCallback(async () => {
-    if (isPreviewing) {
-      await stopPreviewSound();
-      setIsPreviewing(false);
-    } else {
-      setIsPreviewing(true);
-      await playPreviewSound(customSoundUri);
-      setTimeout(async () => {
-        await stopPreviewSound();
-        setIsPreviewing(false);
-      }, 10000);
-    }
-  }, [isPreviewing, customSoundUri]);
-
-  const handleResetSound = useCallback(async () => {
-    if (customSoundUri) {
-      await deleteCustomSound(customSoundUri);
-    }
-    clearCustomSound();
-    await stopPreviewSound();
-    setIsPreviewing(false);
-  }, [customSoundUri, clearCustomSound]);
-
-  const handlePickReminderSound = useCallback(async () => {
-    try {
-      const result = await pickAudioFile();
-      if (result) {
-        if (customReminderSoundUri) {
-          await deleteCustomSound(customReminderSoundUri);
-        }
-        setCustomReminderSound(result.uri, result.name);
-      }
-    } catch {
-      Alert.alert('Error', 'Failed to select audio file. Please try again.');
-    }
-  }, [customReminderSoundUri, setCustomReminderSound]);
-
-  const handlePreviewReminder = useCallback(async () => {
-    if (isPreviewingReminder) {
-      await stopPreviewSound();
-      setIsPreviewingReminder(false);
-    } else {
-      setIsPreviewingReminder(true);
-      await playPreviewSound(customReminderSoundUri);
-      setTimeout(async () => {
-        await stopPreviewSound();
-        setIsPreviewingReminder(false);
-      }, 10000);
-    }
-  }, [isPreviewingReminder, customReminderSoundUri]);
-
-  const handleResetReminderSound = useCallback(async () => {
-    if (customReminderSoundUri) {
-      await deleteCustomSound(customReminderSoundUri);
-    }
-    clearCustomReminderSound();
-    await stopPreviewSound();
-    setIsPreviewingReminder(false);
-  }, [customReminderSoundUri, clearCustomReminderSound]);
-
-  useEffect(() => {
-    return () => { stopPreviewSound(); };
-  }, []);
+  const {
+    customSoundUri,
+    customSoundName,
+    isPreviewing,
+    handlePickSound,
+    handlePreview,
+    handleResetSound,
+    customReminderSoundUri,
+    customReminderSoundName,
+    isPreviewingReminder,
+    handlePickReminderSound,
+    handlePreviewReminder,
+    handleResetReminderSound,
+  } = useSoundPicker();
 
   const handleSnoozeDuration = () => {
     const options = [5, 10, 15, 20, 30];

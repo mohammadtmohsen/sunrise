@@ -4,12 +4,17 @@ import notifee, {
   AndroidVisibility,
 } from '@notifee/react-native';
 import { AppRegistry, Linking, Platform } from 'react-native';
-import { dismissAlarm, scheduleSnooze } from './src/services/alarmScheduler';
 import { scheduleAllAlarms } from './src/services/alarmScheduler';
-import { scheduleNextDayAlarm } from './src/services/nextDayScheduler';
 import { updatePersistentNotification } from './src/services/persistentNotificationService';
 import { getSunTimes } from './src/services/sunCalcService';
 import { playAlarmSound, stopAlarmSound } from './src/services/soundService';
+import {
+  handleSnooze,
+  handleDismiss,
+  handleReminderDismiss,
+  handleAlarmDelivered,
+  handleAlarmPress,
+} from './src/services/alarmEventHandler';
 import { useAlarmStore } from './src/stores/alarmStore';
 import { useLocationStore } from './src/stores/locationStore';
 import { mmkv } from './src/stores/storage';
@@ -60,62 +65,23 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 
   switch (type) {
     case EventType.DELIVERED:
-      if (isReminder) {
-        // Reminder — don't store pending alarm, just let notification stay visible
-        console.log('[BackgroundEvent] DELIVERED reminder — updating persistent notification');
-      } else {
-        // Full alarm — store for when app opens
-        console.log('[BackgroundEvent] DELIVERED — storing pending alarm:', alarmId);
-        mmkv.set('pending-alarm-id', alarmId);
-      }
-      // Update persistent notification immediately so chronometer switches to next alarm
-      // instead of counting past zero on the fired alarm
-      await updatePersistentNotification();
+      await handleAlarmDelivered(alarmId, !!isReminder);
       break;
     case EventType.PRESS:
-      if (isReminder) {
-        // Reminder tapped — cancel notification and schedule next day
-        if (detail.notification?.id) {
-          await notifee.cancelNotification(detail.notification.id);
-        }
-        await scheduleNextDayAlarm(alarmId);
-        await updatePersistentNotification();
-      } else {
-        // Full alarm tapped — store for when app opens
-        console.log('[BackgroundEvent] PRESS — storing pending alarm:', alarmId);
-        mmkv.set('pending-alarm-id', alarmId);
-      }
+      await handleAlarmPress(alarmId, !!isReminder, detail.notification?.id);
       break;
     case EventType.ACTION_PRESS:
       if (detail.pressAction?.id === 'dismiss') {
-        await stopAlarmSound();
-        await dismissAlarm(alarmId);
-        await scheduleNextDayAlarm(alarmId);
-        await updatePersistentNotification();
+        await handleDismiss(alarmId);
       } else if (detail.pressAction?.id === 'snooze') {
-        await stopAlarmSound();
-        if (alarm) {
-          await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
-          // Update nextTriggerAt to snooze time so persistent notification shows correct countdown
-          const snoozeAt = new Date(Date.now() + alarm.snoozeDurationMinutes * 60 * 1000);
-          useAlarmStore.getState().updateAlarm(alarmId, {
-            nextTriggerAt: snoozeAt.toISOString(),
-          });
-          await dismissAlarm(alarmId);
-        }
-        await updatePersistentNotification();
+        await handleSnooze(alarmId);
       }
       break;
     case EventType.DISMISSED:
       if (isReminder) {
-        // Reminder swiped away — schedule next day
-        await scheduleNextDayAlarm(alarmId);
-        await updatePersistentNotification();
+        await handleReminderDismiss(alarmId, detail.notification?.id);
       } else {
-        await stopAlarmSound();
-        await dismissAlarm(alarmId);
-        await scheduleNextDayAlarm(alarmId);
-        await updatePersistentNotification();
+        await handleDismiss(alarmId);
       }
       break;
   }
@@ -186,11 +152,10 @@ notifee.registerForegroundService((notification) => {
     // Also dismiss the alarm and schedule the next occurrence so it isn't lost.
     setTimeout(async () => {
       console.log('[ForegroundService] Auto-cleanup after timeout');
-      await stopAlarmSound();
       if (alarmId) {
-        await dismissAlarm(alarmId);
-        await scheduleNextDayAlarm(alarmId);
-        await updatePersistentNotification();
+        await handleDismiss(alarmId);
+      } else {
+        await stopAlarmSound();
       }
       resolve();
     }, 5 * 60 * 1000);

@@ -20,9 +20,8 @@ import Animated, {
   withTiming,
   runOnJS,
 } from 'react-native-reanimated';
-import notifee from '@notifee/react-native';
 import { playAlarmSound, stopAlarmSound } from '../services/soundService';
-import { scheduleSnooze } from '../services/alarmScheduler';
+import { handleSnooze, handleDismiss } from '../services/alarmEventHandler';
 import { useAlarmStore } from '../stores/alarmStore';
 import { SunriseIcon } from './Icons';
 import { COLORS } from '../utils/constants';
@@ -43,6 +42,8 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
   const alarmName =
     notification?.data?.alarmName ?? notification?.title ?? 'Alarm';
   const alarmId = notification?.data?.alarmId as string | undefined;
+  const alarm = alarmId ? useAlarmStore.getState().alarms[alarmId] : null;
+  const snoozeMins = alarm?.snoozeDurationMinutes ?? 5;
 
   // Update clock every second
   useEffect(() => {
@@ -69,45 +70,19 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
     );
   }, []);
 
-  const handleDismiss = useCallback(async () => {
-    await stopAlarmSound();
+  const onDismiss = useCallback(async () => {
     if (alarmId) {
-      try {
-        await notifee.cancelNotification(alarmId);
-      } catch {
-        // May not exist
-      }
-    }
-    // Stop the foreground service
-    try {
-      await notifee.stopForegroundService();
-    } catch {
-      // May not be running
+      await handleDismiss(alarmId);
+    } else {
+      await stopAlarmSound();
     }
   }, [alarmId]);
 
-  const handleSnooze = useCallback(async () => {
-    await stopAlarmSound();
+  const onSnooze = useCallback(async () => {
     if (alarmId) {
-      // Actually schedule the snooze alarm before cancelling
-      const alarm = useAlarmStore.getState().alarms[alarmId];
-      if (alarm) {
-        try {
-          await scheduleSnooze(alarm, alarm.snoozeDurationMinutes);
-        } catch (e) {
-          console.warn('[AlarmScreen] Failed to schedule snooze:', e);
-        }
-      }
-      try {
-        await notifee.cancelNotification(alarmId);
-      } catch {
-        // May not exist
-      }
-    }
-    try {
-      await notifee.stopForegroundService();
-    } catch {
-      // May not be running
+      await handleSnooze(alarmId);
+    } else {
+      await stopAlarmSound();
     }
   }, [alarmId]);
 
@@ -121,7 +96,7 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
     .onEnd((event) => {
       if (event.translationY < DISMISS_THRESHOLD) {
         translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 300 });
-        runOnJS(handleDismiss)();
+        runOnJS(onDismiss)();
       } else {
         translateY.value = withSpring(0);
       }
@@ -197,7 +172,7 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
 
           <View style={{ width: '100%', gap: 12 }}>
             <Pressable
-              onPress={handleDismiss}
+              onPress={onDismiss}
               style={({ pressed }) => ({
                 paddingVertical: 18,
                 borderRadius: 30,
@@ -213,7 +188,7 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
             </Pressable>
 
             <Pressable
-              onPress={handleSnooze}
+              onPress={onSnooze}
               style={({ pressed }) => ({
                 paddingVertical: 18,
                 borderRadius: 30,
@@ -228,7 +203,7 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
                   fontWeight: '600',
                 }}
               >
-                Snooze 5 min
+                Snooze · {snoozeMins} min
               </Text>
             </Pressable>
           </View>

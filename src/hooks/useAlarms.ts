@@ -9,16 +9,25 @@ import { updatePersistentNotification } from '../services/persistentNotification
 import type { SunTimes } from '../models/types';
 
 export function useAlarms(sunTimes: SunTimes | null) {
-  const {
-    alarms,
-    addAlarm,
-    updateAlarm,
-    deleteAlarm,
-    toggleAlarm,
-    recalculateAllTriggerTimes,
-    getAlarmsArray,
-    getEnabledAlarms,
-  } = useAlarmStore();
+  const alarms = useAlarmStore((s) => s.alarms);
+  const addAlarm = useAlarmStore((s) => s.addAlarm);
+  const updateAlarm = useAlarmStore((s) => s.updateAlarm);
+  const deleteAlarm = useAlarmStore((s) => s.deleteAlarm);
+  const toggleAlarm = useAlarmStore((s) => s.toggleAlarm);
+  const recalculateAllTriggerTimes = useAlarmStore((s) => s.recalculateAllTriggerTimes);
+
+  // Stable sorted array — only recomputes when the alarms record changes
+  const alarmsArray = useMemo(() => {
+    return Object.values(alarms).sort((a, b) => {
+      const aTime = a.nextTriggerAt ? new Date(a.nextTriggerAt).getTime() : Infinity;
+      const bTime = b.nextTriggerAt ? new Date(b.nextTriggerAt).getTime() : Infinity;
+      return aTime - bTime;
+    });
+  }, [alarms]);
+
+  const enabledAlarms = useMemo(() => {
+    return Object.values(alarms).filter((a) => a.isEnabled);
+  }, [alarms]);
 
   // Stable key that changes when alarm IDs, types, offsets, or enabled state change
   // but NOT when nextTriggerAt or notificationId change (which recalculate sets)
@@ -70,8 +79,8 @@ export function useAlarms(sunTimes: SunTimes | null) {
   );
 
   return {
-    alarms: getAlarmsArray(),
-    enabledAlarms: getEnabledAlarms(),
+    alarms: alarmsArray,
+    enabledAlarms,
     addAlarm,
     updateAlarm,
     deleteAlarm,
