@@ -53,7 +53,9 @@
       "./plugins/withBootReceiver",
       "./plugins/withIOSAlarmPermissions",
       "./plugins/withMMKVFix",
-      "./plugins/withWearOS"
+      "./plugins/withWearOS",
+      "./plugins/withNativeAlarmEngine",
+      "expo-notifications"
     ],
     "extra": {
       "router": {},

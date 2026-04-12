@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.google.android.gms.tasks.Tasks
+import androidx.wear.tiles.TileService
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -11,6 +12,7 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.gson.Gson
+import com.lumora.wear.tile.AlarmTileService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,7 +26,7 @@ import java.time.Instant
  * Repository that manages alarm data synchronization between
  * the watch and phone via the Wearable Data Layer API.
  */
-class DataLayerRepository private constructor(context: Context) :
+class DataLayerRepository private constructor(private val appContext: Context) :
     DataClient.OnDataChangedListener {
 
     companion object {
@@ -45,7 +47,7 @@ class DataLayerRepository private constructor(context: Context) :
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val dataClient: DataClient = Wearable.getDataClient(context)
+    private val dataClient: DataClient = Wearable.getDataClient(appContext)
 
     private val _alarms = MutableStateFlow<Map<String, Alarm>>(emptyMap())
     val alarms: StateFlow<Map<String, Alarm>> = _alarms.asStateFlow()
@@ -113,6 +115,7 @@ class DataLayerRepository private constructor(context: Context) :
 
                 Tasks.await(dataClient.putDataItem(request))
                 _alarms.value = alarms
+                requestTileUpdate()
                 Log.d(TAG, "Alarms synced to phone: ${alarms.size} alarms")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to sync alarms to phone", e)
@@ -178,8 +181,20 @@ class DataLayerRepository private constructor(context: Context) :
             if (payload.sunTimes != null) {
                 _sunTimes.value = payload.sunTimes
             }
+            // Refresh the tile so it shows updated sun times and next alarm
+            requestTileUpdate()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse alarm data", e)
+        }
+    }
+
+    /** Request the Lumora tile to refresh with latest data */
+    private fun requestTileUpdate() {
+        try {
+            TileService.getUpdater(appContext)
+                .requestUpdate(AlarmTileService::class.java)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to request tile update", e)
         }
     }
 

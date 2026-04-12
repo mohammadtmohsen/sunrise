@@ -1,13 +1,5 @@
-import notifee, {
-  TriggerType,
-  AndroidCategory,
-  AndroidImportance,
-  AndroidVisibility,
-  AndroidStyle,
-  AndroidLaunchActivityFlag,
-  AlarmType,
-} from '@notifee/react-native';
 import { Platform, Alert } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import type { Alarm, SunTimes } from '../models/types';
 import {
   computeTriggerTime,
@@ -20,7 +12,16 @@ import {
   formatRepeatDays,
 } from '../utils/timeUtils';
 import { scheduleNotificationRefresh } from './notificationRefreshService';
-import { ALARM_CHANNEL_ID, REMINDER_CHANNEL_ID, ALARM_GROUP_ID } from '../utils/constants';
+import {
+  scheduleNativeAlarm,
+  cancelNativeAlarm,
+  cancelNativeReminder,
+  scheduleNativeReminder,
+  snoozeNativeAlarm,
+  dismissNativeAlarm,
+  getNativeNotificationSettings,
+  openNativeAlarmPermissionSettings,
+} from './nativeAlarmEngine';
 
 /**
  * Ensure Android exact alarm permission is granted.
@@ -31,9 +32,8 @@ async function ensureExactAlarmPermission(): Promise<boolean> {
   if (Platform.OS !== 'android') return true;
 
   try {
-    const settings = await notifee.getNotificationSettings();
-    // android.alarm is 1 (ENABLED) if exact alarms are allowed
-    if (settings.android?.alarm === 1) return true;
+    const settings = await getNativeNotificationSettings();
+    if (settings.alarm) return true;
 
     // Wait for user to choose an action before returning
     const granted = await new Promise<boolean>((resolve) => {
@@ -46,7 +46,7 @@ async function ensureExactAlarmPermission(): Promise<boolean> {
             text: 'Open Settings',
             onPress: async () => {
               try {
-                await notifee.openAlarmPermissionSettings();
+                await openNativeAlarmPermissionSettings();
               } catch {
                 // Settings may not be available
               }
@@ -124,8 +124,10 @@ export type ScheduleResult =
   | { success: false; reason: ScheduleFailure };
 
 /**
- * Schedule a single alarm via Notifee.
- * Supports both relative (sunrise/sunset) and absolute (fixed time) alarms.
+ * Schedule a single alarm.
+ * - Android alarm-style: uses native AlarmEngine
+ * - Android reminder-style: uses native AlarmEngine reminder
+ * - iOS: uses expo-notifications
  *
  * sunTimes can be null for absolute alarms (they don't depend on sun position).
  */
@@ -155,119 +157,74 @@ export async function scheduleAlarm(
   const isReminder = alarm.alarmStyle === 'reminder';
 
   try {
-    const notificationId = await notifee.createTriggerNotification(
-      {
-        id: alarm.id,
+    if (Platform.OS === 'android') {
+      if (isReminder) {
+        // REMINDER style on Android: use native AlarmEngine reminder
+        await scheduleNativeReminder({
+          alarmId: alarm.id,
+          triggerTime,
+          title: alarm.name,
+          body,
+          soundUri: alarm.soundUri,
+          vibrate: alarm.vibrate,
+          repeatMode: alarm.repeatMode,
+        });
+        console.log(
+          '[scheduleAlarm] Native reminder scheduled:', alarm.id,
+          'at', triggerTime.toISOString(),
+          '| in', Math.round((triggerTime.getTime() - Date.now()) / 1000), 'seconds',
+        );
+      } else {
+        // ALARM style on Android: use native AlarmEngine for 100% reliable
+        // fullscreen alarm, sound, and lock screen support on Android 14+/15.
+        await scheduleNativeAlarm({
+          alarmId: alarm.id,
+          triggerTime,
+          title: alarm.name,
+          body,
+          soundUri: alarm.soundUri,
+          vibrate: alarm.vibrate,
+          snoozeDurationMinutes: alarm.snoozeDurationMinutes,
+          repeatMode: alarm.repeatMode,
+        });
+        console.log(
+          '[scheduleAlarm] Native alarm scheduled:', alarm.id,
+          'at', triggerTime.toISOString(),
+          '| in', Math.round((triggerTime.getTime() - Date.now()) / 1000), 'seconds',
+        );
+      }
+      return { success: true, notificationId: alarm.id, triggerTime };
+    }
+
+    // iOS: use expo-notifications
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
         title: alarm.name,
         body,
+        sound: isReminder ? 'default' : 'alarm-default.caf',
         data: {
           alarmId: alarm.id,
           alarmName: alarm.name,
           type: 'alarm-trigger',
+          isReminder: isReminder ? 'true' : 'false',
         },
-        android: isReminder
-          ? {
-              channelId: REMINDER_CHANNEL_ID,
-              groupId: ALARM_GROUP_ID,
-              importance: AndroidImportance.HIGH,
-              visibility: AndroidVisibility.PUBLIC,
-              sound: 'default',
-              vibrationPattern: [100, 200],
-              lightUpScreen: true,
-              autoCancel: false,
-              ongoing: false,
-              badgeCount: 0,
-              pressAction: { id: 'default' },
-              actions: [
-                {
-                  title: 'Dismiss',
-                  pressAction: { id: 'dismiss' },
-                },
-              ],
-              style: {
-                type: AndroidStyle.BIGTEXT,
-                text: `${alarm.name}\n${body}`,
-              },
-            }
-          : {
-              channelId: ALARM_CHANNEL_ID,
-              groupId: ALARM_GROUP_ID,
-              category: AndroidCategory.ALARM,
-              importance: AndroidImportance.HIGH,
-              visibility: AndroidVisibility.PUBLIC,
-              sound: 'default',
-              vibrationPattern: [500, 200, 500, 200],
-              lightUpScreen: true,
-              autoCancel: false,
-              ongoing: true,
-              badgeCount: 0,
-              asForegroundService: true,
-              fullScreenAction: {
-                id: 'default',
-                launchActivity: 'default',
-                launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
-              },
-              pressAction: {
-                id: 'default',
-                launchActivity: 'default',
-                launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
-              },
-              actions: [
-                {
-                  title: 'Dismiss',
-                  pressAction: { id: 'dismiss' },
-                },
-                {
-                  title: 'Snooze',
-                  pressAction: { id: 'snooze' },
-                },
-              ],
-              style: {
-                type: AndroidStyle.BIGTEXT,
-                text: `${alarm.name}\n${body}`,
-              },
-            },
-        ios: isReminder
-          ? {
-              sound: 'default',
-              interruptionLevel: 'timeSensitive',
-              foregroundPresentationOptions: {
-                banner: true,
-                sound: true,
-                badge: true,
-                list: true,
-              },
-            }
-          : {
-              critical: true,
-              criticalVolume: 1.0,
-              sound: 'alarm-default.caf',
-              interruptionLevel: 'timeSensitive',
-              categoryId: 'alarm-actions',
-              foregroundPresentationOptions: {
-                banner: true,
-                sound: true,
-                badge: false,
-                list: true,
-              },
-            },
+        categoryIdentifier: isReminder ? undefined : 'alarm-actions',
       },
-      {
-        type: TriggerType.TIMESTAMP,
-        timestamp: triggerTime.getTime(),
-        alarmManager: {
-          // SET_ALARM_CLOCK is the most reliable alarm type on Android —
-          // immune to Doze mode and battery optimization. Always use it.
-          type: AlarmType.SET_ALARM_CLOCK,
-          allowWhileIdle: true,
-        },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerTime,
       },
-    );
+    });
 
-    console.log('[scheduleAlarm] Scheduled:', alarm.id, 'at', triggerTime.toISOString());
+    console.log(
+      '[scheduleAlarm] expo-notifications scheduled:', alarm.id,
+      'at', triggerTime.toISOString(),
+      '| in', Math.round((triggerTime.getTime() - Date.now()) / 1000), 'seconds',
+      '| style:', alarm.alarmStyle,
+    );
     return { success: true, notificationId, triggerTime };
   } catch (error) {
-    console.error('[scheduleAlarm] Failed to create trigger notification:', error);
+    console.error('[scheduleAlarm] Failed to schedule alarm:', error);
     return { success: false, reason: 'error' };
   }
 }
@@ -276,17 +233,19 @@ export async function scheduleAlarm(
  * Cancel a scheduled alarm notification and any active snooze.
  */
 export async function cancelAlarm(alarm: Alarm): Promise<void> {
-  const ids = [alarm.id, `${alarm.id}-snooze`, `${alarm.id}-persist`, `${alarm.id}-watch`, `status-alarm-${alarm.id}`];
-  for (const id of ids) {
-    try {
-      await notifee.cancelNotification(id);
-    } catch {
-      // Notification may not exist
-    }
-    try {
-      await notifee.cancelTriggerNotification(id);
-    } catch {
-      // Trigger may not exist
+  if (Platform.OS === 'android') {
+    // Cancel both native alarm and reminder since we don't always know which type was scheduled
+    try { await cancelNativeAlarm(alarm.id); } catch {}
+    try { await cancelNativeReminder(alarm.id); } catch {}
+  } else {
+    // iOS: cancel via expo-notifications
+    const ids = [alarm.id, `${alarm.id}-snooze`];
+    for (const id of ids) {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(id);
+      } catch {
+        // Notification may not exist
+      }
     }
   }
 }
@@ -330,75 +289,31 @@ export async function scheduleSnooze(
 ): Promise<string> {
   const snoozeTime = Date.now() + snoozeDurationMinutes * 60 * 1000;
 
-  const notificationId = await notifee.createTriggerNotification(
-    {
-      id: `${alarm.id}-snooze`,
+  if (Platform.OS === 'android') {
+    await snoozeNativeAlarm(alarm.id, snoozeDurationMinutes);
+    return `${alarm.id}-snooze`;
+  }
+
+  // iOS: use expo-notifications for snooze
+  const notificationId = await Notifications.scheduleNotificationAsync({
+    identifier: `${alarm.id}-snooze`,
+    content: {
       title: `${alarm.name} (Snoozed)`,
       body: `Alarm in ${snoozeDurationMinutes} minutes`,
+      sound: 'alarm-default.caf',
       data: {
         alarmId: alarm.id,
         alarmName: alarm.name,
         type: 'alarm-trigger',
         isSnooze: 'true',
       },
-      android: {
-        channelId: ALARM_CHANNEL_ID,
-        groupId: ALARM_GROUP_ID,
-        category: AndroidCategory.ALARM,
-        importance: AndroidImportance.HIGH,
-        visibility: AndroidVisibility.PUBLIC,
-        sound: 'default',
-        vibrationPattern: [500, 200, 500, 200],
-        lightUpScreen: true,
-        autoCancel: false,
-        ongoing: true,
-        badgeCount: 0,
-        asForegroundService: true,
-        fullScreenAction: {
-          id: 'default',
-          mainComponent: 'alarm-screen',
-          launchActivity: 'default',
-          launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
-        },
-        pressAction: {
-          id: 'default',
-          launchActivity: 'default',
-          launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
-        },
-        actions: [
-          {
-            title: 'Dismiss',
-            pressAction: { id: 'dismiss' },
-          },
-          {
-            title: 'Snooze',
-            pressAction: { id: 'snooze' },
-          },
-        ],
-      },
-      ios: {
-        critical: true,
-        criticalVolume: 1.0,
-        sound: 'alarm-default.caf',
-        interruptionLevel: 'timeSensitive',
-        categoryId: 'alarm-actions',
-        foregroundPresentationOptions: {
-          banner: true,
-          sound: true,
-          badge: false,
-          list: true,
-        },
-      },
+      categoryIdentifier: 'alarm-actions',
     },
-    {
-      type: TriggerType.TIMESTAMP,
-      timestamp: snoozeTime,
-      alarmManager: {
-        type: AlarmType.SET_ALARM_CLOCK,
-        allowWhileIdle: true,
-      },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: new Date(snoozeTime),
     },
-  );
+  });
 
   return notificationId;
 }
@@ -407,20 +322,24 @@ export async function scheduleSnooze(
 export { scheduleNotificationRefresh } from './notificationRefreshService';
 
 /**
- * Dismiss an active alarm — cancel notification + stop foreground service.
+ * Dismiss an active alarm — cancel notification + stop native alarm service.
  */
 export async function dismissAlarm(alarmId: string): Promise<void> {
-  const ids = [alarmId, `${alarmId}-snooze`, `${alarmId}-persist`, `${alarmId}-watch`, `status-alarm-${alarmId}`];
-  for (const id of ids) {
-    try {
-      await notifee.cancelNotification(id);
-    } catch {
-      // May not exist
+  if (Platform.OS === 'android') {
+    // Dismiss active native alarm (stops sound, cancels notifications)
+    try { await dismissNativeAlarm(); } catch {}
+    // Also cancel any scheduled alarm/reminder for cleanup
+    try { await cancelNativeAlarm(alarmId); } catch {}
+    try { await cancelNativeReminder(alarmId); } catch {}
+  } else {
+    // iOS: cancel any pending notifications
+    const ids = [alarmId, `${alarmId}-snooze`];
+    for (const id of ids) {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(id);
+      } catch {
+        // May not exist
+      }
     }
-  }
-  try {
-    await notifee.stopForegroundService();
-  } catch {
-    // May not be running
   }
 }

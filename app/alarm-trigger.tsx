@@ -8,7 +8,7 @@ import {
   Platform,
   BackHandler,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -30,11 +30,11 @@ import Svg, {
   RadialGradient,
   Stop,
 } from 'react-native-svg';
-import notifee from '@notifee/react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useAlarmStore } from '../src/stores/alarmStore';
 import { playAlarmSound, stopAlarmSound } from '../src/services/soundService';
 import { handleSnooze, handleDismiss } from '../src/services/alarmEventHandler';
+import { dismissNativeAlarm } from '../src/services/nativeAlarmEngine';
 import { formatTime } from '../src/utils/timeUtils';
 import { COLORS } from '../src/utils/constants';
 import { mmkv } from '../src/stores/storage';
@@ -63,12 +63,31 @@ export default function AlarmTriggerScreen() {
   const params = useLocalSearchParams<{ alarmId: string }>();
   // Use alarmId from URL params, or fall back to MMKV pending-alarm-id
   // (covers deep links that arrive before pending alarm poll runs)
-  const alarmId = params.alarmId || mmkv.getString('pending-alarm-id') || undefined;
+  const pendingId = mmkv.getString('pending-alarm-id');
+  const alarmId = params.alarmId || pendingId || undefined;
   const alarm = useAlarmStore((s) => (alarmId ? s.alarms[alarmId] : null));
   // Fallback name from MMKV in case store isn't hydrated yet
   const fallbackName = mmkv.getString('pending-alarm-name') || undefined;
   const alarmName = alarm?.name ?? fallbackName ?? 'Alarm';
   const [currentTime, setCurrentTime] = useState(new Date());
+  const router = useRouter();
+
+  // If there's no pending alarm (stale deep link from a previous alarm),
+  // redirect back to home instead of showing the trigger screen
+  useEffect(() => {
+    if (!pendingId && params.alarmId) {
+      // Deep link but no pending alarm — this is a stale URL, go home
+      try {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/');
+        }
+      } catch {
+        // Navigation not ready yet — ignore
+      }
+    }
+  }, []);
 
   const translateY = useSharedValue(0);
   const breathe = useSharedValue(0);
@@ -87,14 +106,12 @@ export default function AlarmTriggerScreen() {
 
     async function setup() {
       if (Platform.OS === 'android' && alarmId) {
-        // Stop foreground service first — this kills the service's sound/vibration
-        try { await notifee.stopForegroundService(); } catch {}
-        try { await notifee.cancelNotification(alarmId); } catch {}
-        try { await notifee.cancelNotification(`${alarmId}-snooze`); } catch {}
+        // Dismiss native alarm service — stops sound/vibration and cancels notifications
+        try { await dismissNativeAlarm(); } catch {}
       }
-      // Stop any existing sound (from foreground service's JS context leaking)
+      // Stop any existing sound (from previous context leaking)
       await stopAlarmSound();
-      // Play sound fresh in this screen's context
+      // Play sound fresh in this screen's context (iOS only — Android native handles it)
       await playAlarmSound();
     }
     setup();

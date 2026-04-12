@@ -9,7 +9,6 @@ const BOOT_RECEIVER_KOTLIN = `package com.lumora.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.facebook.react.HeadlessJsTaskService
 
 class BootAlarmReceiver : BroadcastReceiver() {
@@ -26,11 +25,7 @@ class BootAlarmReceiver : BroadcastReceiver() {
                 // the device from going back to sleep before the headless task runs
                 HeadlessJsTaskService.acquireWakeLockNow(context)
                 val serviceIntent = Intent(context, BootAlarmTaskService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
+                context.startService(serviceIntent)
             } catch (_: Exception) {
                 // Service start may fail on some OEMs
             }

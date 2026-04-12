@@ -1,16 +1,14 @@
-import notifee, {
-  AndroidImportance,
-  AndroidStyle,
-  AndroidVisibility,
-} from '@notifee/react-native';
 import { Platform } from 'react-native';
 import { useAlarmStore } from '../stores/alarmStore';
 import { useLocationStore } from '../stores/locationStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getSunTimes, isSunTimesValid } from './sunCalcService';
-import { STATUS_CHANNEL_ID, STATUS_NOTIFICATION_ID } from '../utils/constants';
 import { formatTime } from '../utils/timeUtils';
 import type { Alarm, SunTimes } from '../models/types';
+import {
+  showNativePersistentNotification,
+  hideNativePersistentNotification,
+} from './nativeAlarmEngine';
 
 /**
  * Get all enabled alarms sorted by next trigger time (soonest first).
@@ -47,8 +45,7 @@ function buildSunLine(sunTimes: SunTimes): string {
 }
 
 /**
- * Build InboxStyle lines listing all registered alarms with relative times.
- * Android InboxStyle supports ~5-7 visible lines when expanded.
+ * Build expanded lines listing all registered alarms with relative times.
  */
 function buildAlarmLines(futureAlarms: Alarm[]): string[] {
   return futureAlarms.map(a => {
@@ -66,10 +63,10 @@ function buildAlarmLines(futureAlarms: Alarm[]): string[] {
  *
  * Single ongoing notification with:
  *   Collapsed: next alarm name + time + live chronometer countdown
- *   Expanded (InboxStyle): all alarms with their times and relative countdowns
+ *   Expanded: all alarms with their times and relative countdowns
  *
  * Should be called whenever alarms, sun times, or settings change.
- * No-op on iOS (iOS does not support ongoing notifications).
+ * Android-only — iOS does not support ongoing notifications.
  */
 export async function updatePersistentNotification(): Promise<void> {
   if (Platform.OS !== 'android') return;
@@ -97,8 +94,7 @@ export async function updatePersistentNotification(): Promise<void> {
 
     let title: string;
     let body: string;
-    let showChronometer = false;
-    let timestamp: number | undefined;
+    let chronoBase = 0;
 
     if (nextAlarm && nextAlarm.nextTriggerAt) {
       const triggerDate = new Date(nextAlarm.nextTriggerAt);
@@ -114,10 +110,8 @@ export async function updatePersistentNotification(): Promise<void> {
         : 'Location not set';
 
       // Only show chronometer if the trigger time is still in the future
-      // This prevents the countdown from going negative
       if (triggerAt > Date.now()) {
-        showChronometer = true;
-        timestamp = triggerAt;
+        chronoBase = triggerAt;
       }
     } else {
       // No active alarms — show sun times as title
@@ -126,41 +120,13 @@ export async function updatePersistentNotification(): Promise<void> {
     }
 
     // Build expanded view with all alarms
-    const alarmLines = buildAlarmLines(futureAlarms);
+    const expandedLines = buildAlarmLines(futureAlarms);
 
-    await notifee.displayNotification({
-      id: STATUS_NOTIFICATION_ID,
+    await showNativePersistentNotification({
       title,
       body,
-      android: {
-        channelId: STATUS_CHANNEL_ID,
-        ongoing: true,
-        autoCancel: false,
-        onlyAlertOnce: true,
-        importance: AndroidImportance.LOW,
-        visibility: AndroidVisibility.PUBLIC,
-        badgeCount: 0,
-        smallIcon: 'ic_launcher',
-        showChronometer,
-        chronometerDirection: 'down',
-        timestamp,
-        pressAction: {
-          id: 'default',
-          launchActivity: 'default',
-        },
-        style: alarmLines.length > 0
-          ? {
-              type: AndroidStyle.INBOX,
-              lines: alarmLines,
-              title: nextAlarm ? nextAlarm.name : 'Lumora',
-            }
-          : {
-              type: AndroidStyle.BIGTEXT,
-              text: sunTimes
-                ? `Sunrise: ${formatTime(sunTimes.sunrise)}  ·  Sunset: ${formatTime(sunTimes.sunset)}\nNo active alarms`
-                : 'No active alarms',
-            },
-      },
+      chronoBase,
+      expandedLines,
     });
   } catch (e) {
     console.warn('Failed to update persistent notification:', e);
@@ -174,7 +140,7 @@ export async function cancelPersistentNotification(): Promise<void> {
   if (Platform.OS !== 'android') return;
 
   try {
-    await notifee.cancelNotification(STATUS_NOTIFICATION_ID);
+    await hideNativePersistentNotification();
   } catch {
     // May not exist
   }

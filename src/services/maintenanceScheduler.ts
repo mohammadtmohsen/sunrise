@@ -1,23 +1,21 @@
-import notifee, {
-  TriggerType,
-  AlarmType,
-  AndroidImportance,
-  AndroidVisibility,
-} from '@notifee/react-native';
 import { Platform } from 'react-native';
 import { useAlarmStore } from '../stores/alarmStore';
 import { useLocationStore } from '../stores/locationStore';
 import { getSunTimes } from './sunCalcService';
 import { scheduleAllAlarms } from './alarmScheduler';
 import { updatePersistentNotification } from './persistentNotificationService';
-import { MAINTENANCE_NOTIFICATION_ID, STATUS_CHANNEL_ID } from '../utils/constants';
+import {
+  scheduleNativeDailyMaintenance,
+  cancelNativeDailyMaintenance,
+} from './nativeAlarmEngine';
 
 /**
- * Schedule a silent daily maintenance alarm using SET_EXACT_AND_ALLOW_WHILE_IDLE.
+ * Schedule a silent daily maintenance alarm.
  * Fires even in Doze mode. Uses exact-idle (not SET_ALARM_CLOCK) to avoid
  * competing with real user alarms for the highest-priority alarm slot.
  *
  * Runs at ~2:30 AM daily to recalculate sun times and reschedule all alarms.
+ * Android-only.
  */
 export async function scheduleDailyMaintenance(): Promise<void> {
   if (Platform.OS !== 'android') return;
@@ -34,34 +32,8 @@ export async function scheduleDailyMaintenance(): Promise<void> {
 
   try {
     // Cancel any existing maintenance trigger
-    await notifee.cancelTriggerNotification(MAINTENANCE_NOTIFICATION_ID);
-
-    await notifee.createTriggerNotification(
-      {
-        id: MAINTENANCE_NOTIFICATION_ID,
-        title: 'Updating alarm schedule',
-        body: 'Recalculating sunrise and sunset times',
-        data: { type: 'maintenance' },
-        android: {
-          channelId: STATUS_CHANNEL_ID,
-          importance: AndroidImportance.LOW,
-          visibility: AndroidVisibility.SECRET,
-          sound: undefined,
-          autoCancel: true,
-          ongoing: false,
-          asForegroundService: false,
-          pressAction: { id: 'default' },
-        },
-      },
-      {
-        type: TriggerType.TIMESTAMP,
-        timestamp: next.getTime(),
-        alarmManager: {
-          type: AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE,
-          allowWhileIdle: true,
-        },
-      },
-    );
+    await cancelNativeDailyMaintenance();
+    await scheduleNativeDailyMaintenance(next);
 
     console.log('[Maintenance] Scheduled for', next.toISOString());
   } catch (error) {

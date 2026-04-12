@@ -16,8 +16,8 @@ export const COLORS = {
   danger: '#ef4444',
 } as const;
 
-export const ALARM_CHANNEL_ID = 'alarm-channel-v2';
-export const REMINDER_CHANNEL_ID = 'reminder-channel-v2';
+export const ALARM_CHANNEL_ID = 'alarm-channel-v3';
+export const REMINDER_CHANNEL_ID = 'reminder-channel-v4';
 export const STATUS_CHANNEL_ID = 'status-channel-v2';
 export const STATUS_NOTIFICATION_ID = 'persistent-status';
 export const MAINTENANCE_NOTIFICATION_ID = 'daily-maintenance';

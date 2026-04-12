@@ -79,7 +79,7 @@ export function AbsoluteTimePicker({ hour, minute, onHourChange, onMinuteChange 
       <Text style={{ color: COLORS.textMuted, fontSize: 32, fontWeight: '700', marginTop: 16 }}>
         :
       </Text>
-      <NumberStepper label="Minutes" value={minute} onChange={onMinuteChange} max={59} step={5} />
+      <NumberStepper label="Minutes" value={minute} onChange={onMinuteChange} max={59} step={1} />
     </View>
   );
 }

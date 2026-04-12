@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Platform, Alert } from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { Platform, Alert, AppState } from 'react-native';
 import {
   checkNotificationPermission,
   checkCriticalAlertsPermission,
@@ -10,6 +10,7 @@ import { requestNotificationPermission } from '../services/notificationService';
 /**
  * Checks and exposes the current status of all device permissions
  * relevant to alarm functionality.
+ * Re-checks when the app returns to the foreground (e.g. after changing settings).
  */
 export function usePermissionStatus() {
   const [notifPermission, setNotifPermission] = useState<boolean | null>(null);
@@ -19,23 +20,34 @@ export function usePermissionStatus() {
     hasPowerManager: boolean;
   } | null>(null);
 
-  useEffect(() => {
-    async function checkPermissions() {
-      const granted = await checkNotificationPermission();
-      setNotifPermission(granted);
+  const checkPermissions = useCallback(async () => {
+    const granted = await checkNotificationPermission();
+    setNotifPermission(granted);
 
-      if (Platform.OS === 'android') {
-        const info = await checkBatteryOptimization();
-        setBatteryInfo(info);
-      }
-
-      if (Platform.OS === 'ios') {
-        const critical = await checkCriticalAlertsPermission();
-        setCriticalAlerts(critical);
-      }
+    if (Platform.OS === 'android') {
+      const info = await checkBatteryOptimization();
+      setBatteryInfo(info);
     }
-    checkPermissions();
+
+    if (Platform.OS === 'ios') {
+      const critical = await checkCriticalAlertsPermission();
+      setCriticalAlerts(critical);
+    }
   }, []);
+
+  useEffect(() => {
+    checkPermissions();
+  }, [checkPermissions]);
+
+  // Re-check when app returns to foreground (after user changes settings)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        checkPermissions();
+      }
+    });
+    return () => sub.remove();
+  }, [checkPermissions]);
 
   const handleNotifPermission = async () => {
     const granted = await requestNotificationPermission();

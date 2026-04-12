@@ -191,12 +191,12 @@ export default function SettingsScreen() {
                 onPress={openFullScreenIntentSettings}
               />
             )}
-            {batteryInfo?.isOptimized && (
+            {batteryInfo && (
               <SettingsRow
                 label='Battery Optimization'
-                value='Disable for alarms'
-                valueColor={COLORS.danger}
-                onPress={openBatterySettings}
+                value={batteryInfo.isOptimized ? 'Disable for alarms' : 'Unrestricted'}
+                valueColor={batteryInfo.isOptimized ? COLORS.danger : COLORS.success}
+                onPress={batteryInfo.isOptimized ? openBatterySettings : undefined}
               />
             )}
             {batteryInfo?.hasPowerManager && (

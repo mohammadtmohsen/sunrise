@@ -4,13 +4,22 @@ import {
   type AudioPlayer,
 } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
+import { Platform } from 'react-native';
 import { useSettingsStore } from '../stores/settingsStore';
+import { dismissNativeAlarm } from './nativeAlarmEngine';
 
 let currentPlayer: AudioPlayer | null = null;
 let vibrationInterval: ReturnType<typeof setInterval> | null = null;
 let previewPlayer: AudioPlayer | null = null;
 
+/**
+ * Play alarm sound. On Android, the native AlarmService handles sound playback,
+ * so this is primarily used on iOS or as a fallback.
+ */
 export async function playAlarmSound(): Promise<void> {
+  // On Android, native AlarmService handles sound — only play in JS on iOS
+  if (Platform.OS === 'android') return;
+
   if (currentPlayer) {
     try {
       currentPlayer.pause();
@@ -110,7 +119,15 @@ export async function stopPreviewSound(): Promise<void> {
   }
 }
 
+/**
+ * Stop alarm sound. On Android, also dismisses the native alarm service
+ * which handles its own sound playback.
+ */
 export async function stopAlarmSound(): Promise<void> {
+  if (Platform.OS === 'android') {
+    try { await dismissNativeAlarm(); } catch {}
+  }
+
   stopVibration();
 
   if (currentPlayer) {

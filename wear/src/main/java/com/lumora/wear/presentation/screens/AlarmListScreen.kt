@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.lumora.wear.data.SyncedSunTimes
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -46,6 +47,7 @@ fun AlarmListScreen(
 ) {
     val alarmsMap by repository.alarms.collectAsState()
     val alarms = alarmsMap.values.sortedBy { it.nextTriggerAt }
+    val sunTimes by repository.sunTimes.collectAsState()
     val listState = rememberScalingLazyListState()
 
     ScalingLazyColumn(
@@ -63,6 +65,16 @@ fun AlarmListScreen(
                     .fillMaxWidth()
                     .padding(bottom = 4.dp),
             )
+        }
+
+        // Sunrise/Sunset times header
+        if (sunTimes != null) {
+            item {
+                SunTimesRow(
+                    sunriseFormatted = sunTimes!!.sunriseFormatted,
+                    sunsetFormatted = sunTimes!!.sunsetFormatted,
+                )
+            }
         }
 
         if (alarms.isEmpty()) {

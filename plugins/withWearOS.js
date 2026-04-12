@@ -233,7 +233,7 @@ function withWearOS(config) {
   config = withMainApplication(config, (config) => {
     const contents = config.modResults.contents;
     const importLine = 'import com.lumora.app.wear.WearDataLayerPackage';
-    const addLine = 'packages.add(WearDataLayerPackage())';
+    const addLine = 'add(WearDataLayerPackage())';
 
     // Add import
     if (!contents.includes(importLine)) {

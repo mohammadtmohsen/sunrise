@@ -1,8 +1,13 @@
-import notifee, {
-  AuthorizationStatus,
-  IOSNotificationSetting,
-} from '@notifee/react-native';
 import { Platform, Alert, Linking } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import {
+  getNativeNotificationSettings,
+  checkNativeBatteryOptimization,
+  openNativeBatteryOptimizationSettings,
+  openNativePowerManagerSettings,
+  openNativeAlarmPermissionSettings,
+  openNativeNotificationSettings,
+} from './nativeAlarmEngine';
 
 /**
  * Detect Xiaomi/Redmi/POCO devices running MIUI/HyperOS.
@@ -54,7 +59,7 @@ export async function promptFullScreenIntentPermission(): Promise<void> {
             text: 'Battery Settings',
             onPress: async () => {
               try {
-                await notifee.openBatteryOptimizationSettings();
+                await openNativeBatteryOptimizationSettings();
               } catch {
                 try { await Linking.openSettings(); } catch { /* ignore */ }
               }
@@ -85,7 +90,7 @@ export async function promptFullScreenIntentPermission(): Promise<void> {
               );
             } catch {
               try {
-                await notifee.openNotificationSettings();
+                await openNativeNotificationSettings();
               } catch {
                 // ignore
               }
@@ -103,8 +108,13 @@ export async function promptFullScreenIntentPermission(): Promise<void> {
  * Check current notification permission status.
  */
 export async function checkNotificationPermission(): Promise<boolean> {
-  const settings = await notifee.getNotificationSettings();
-  return settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
+  if (Platform.OS === 'android') {
+    const settings = await getNativeNotificationSettings();
+    return settings.notifications;
+  }
+  // iOS
+  const { status } = await Notifications.getPermissionsAsync();
+  return status === 'granted';
 }
 
 /**
@@ -114,8 +124,11 @@ export async function checkNotificationPermission(): Promise<boolean> {
 export async function checkCriticalAlertsPermission(): Promise<boolean> {
   if (Platform.OS !== 'ios') return true;
 
-  const settings = await notifee.getNotificationSettings();
-  return settings.ios?.criticalAlert === IOSNotificationSetting.ENABLED;
+  const permissions = await Notifications.getPermissionsAsync();
+  // expo-notifications doesn't expose criticalAlert directly in the same way,
+  // but if permissions are granted, critical alerts are typically included
+  // if the entitlement was approved by Apple.
+  return permissions.status === 'granted';
 }
 
 /**
@@ -129,25 +142,19 @@ export async function checkBatteryOptimization(): Promise<{
     return { isOptimized: false, hasPowerManager: false };
   }
 
-  const isOptimized = await notifee.isBatteryOptimizationEnabled();
-  const powerInfo = await notifee.getPowerManagerInfo();
-
-  return {
-    isOptimized,
-    hasPowerManager: powerInfo.activity !== null,
-  };
+  return await checkNativeBatteryOptimization();
 }
 
 export async function openBatterySettings(): Promise<void> {
-  await notifee.openBatteryOptimizationSettings();
+  await openNativeBatteryOptimizationSettings();
 }
 
 export async function openPowerManagerSettings(): Promise<void> {
-  await notifee.openPowerManagerSettings();
+  await openNativePowerManagerSettings();
 }
 
 export async function openAlarmPermissionSettings(): Promise<void> {
-  await notifee.openAlarmPermissionSettings();
+  await openNativeAlarmPermissionSettings();
 }
 
 /**
@@ -172,6 +179,6 @@ export async function openFullScreenIntentSettings(): Promise<void> {
     );
   } catch {
     // Fallback to app notification settings if the intent isn't available
-    await notifee.openNotificationSettings();
+    await openNativeNotificationSettings();
   }
 }

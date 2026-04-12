@@ -5,7 +5,7 @@ const { withAndroidManifest } = require('expo/config-plugins');
  *
  * Modifies AndroidManifest.xml to add:
  * - USE_FULL_SCREEN_INTENT permission (required for alarm full-screen UI)
- * - FOREGROUND_SERVICE permission (required for persistent alarm sound)
+ * - FOREGROUND_SERVICE permission (required for native AlarmService)
  * - FOREGROUND_SERVICE_MEDIA_PLAYBACK permission (Android 14+ foreground service type)
  * - REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (for prompting battery optimization exemption)
  * - showWhenLocked="true" on MainActivity (show over lock screen)
@@ -26,6 +26,8 @@ function withAlarmPermissions(config) {
       'android.permission.SCHEDULE_EXACT_ALARM',
       'android.permission.USE_EXACT_ALARM',
       'android.permission.WAKE_LOCK',
+      'android.permission.ACCESS_NOTIFICATION_POLICY',
+      'android.permission.POST_NOTIFICATIONS',
     ];
 
     for (const perm of permissionsToAdd) {
@@ -40,38 +42,10 @@ function withAlarmPermissions(config) {
     }
     manifest['uses-permission'] = permissions;
 
-    // --- MainActivity attributes ---
-    const application = manifest.application?.[0];
-    if (application?.activity) {
-      for (const activity of application.activity) {
-        if (
-          activity.$?.['android:name'] === '.MainActivity' ||
-          activity.$?.['android:name']?.endsWith('.MainActivity')
-        ) {
-          // Show the activity over the lock screen
-          activity.$['android:showWhenLocked'] = 'true';
-          // Turn the screen on when this activity launches
-          activity.$['android:turnScreenOn'] = 'true';
-        }
-      }
-    }
-
-    // --- Foreground service type for Notifee's service ---
-    // Notifee registers its own ForegroundService in its manifest.
-    // On Android 14+, foreground services must declare a type.
-    // We add foregroundServiceType to the Notifee service if present.
-    if (application?.service) {
-      for (const service of application.service) {
-        const serviceName = service.$?.['android:name'] || '';
-        if (
-          serviceName.includes('notifee') ||
-          serviceName.includes('Notifee') ||
-          serviceName.includes('ForegroundService')
-        ) {
-          service.$['android:foregroundServiceType'] = 'mediaPlayback';
-        }
-      }
-    }
+    // NOTE: showWhenLocked and turnScreenOn are ONLY on AlarmActivity
+    // (declared in withNativeAlarmEngine plugin), NOT on MainActivity.
+    // Having them on MainActivity causes the app to show over the lock screen
+    // when AlarmActivity finishes, preventing the phone from re-locking.
 
     return config;
   });

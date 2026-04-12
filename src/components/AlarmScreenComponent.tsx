@@ -6,6 +6,7 @@ import {
   Dimensions,
   AppRegistry,
   Platform,
+  BackHandler,
 } from 'react-native';
 import {
   GestureHandlerRootView,
@@ -20,6 +21,7 @@ import Animated, {
   withTiming,
   runOnJS,
 } from 'react-native-reanimated';
+import { dismissNativeAlarm } from '../services/nativeAlarmEngine';
 import { playAlarmSound, stopAlarmSound } from '../services/soundService';
 import { handleSnooze, handleDismiss } from '../services/alarmEventHandler';
 import { useAlarmStore } from '../stores/alarmStore';
@@ -30,7 +32,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DISMISS_THRESHOLD = -150;
 
 /**
- * Standalone alarm screen rendered by Notifee's fullScreenAction mainComponent.
+ * Standalone alarm screen rendered by native AlarmActivity.
  * This runs in a separate React Native root on Android when the full-screen intent fires
  * (e.g., device is locked/screen off). It does NOT have access to Expo Router navigation.
  */
@@ -51,15 +53,25 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
     return () => clearInterval(interval);
   }, []);
 
-  // On Android, the foreground service already plays sound — only play on iOS
+  // Sound lifecycle — matches alarm-trigger.tsx pattern.
+  // On Android, the native AlarmService plays sound.
+  // We dismiss native alarm first, then play fresh in this component's context if needed.
   useEffect(() => {
-    if (Platform.OS === 'ios') {
-      playAlarmSound();
+    async function setup() {
+      if (Platform.OS === 'android') {
+        // Dismiss native alarm service — stops sound/vibration and cancels notifications
+        try { await dismissNativeAlarm(); } catch {}
+      }
+      // Stop any lingering sound, then play fresh
+      await stopAlarmSound();
+      await playAlarmSound();
     }
+    setup();
+
     return () => {
       stopAlarmSound();
     };
-  }, []);
+  }, [alarmId]);
 
   // Pulse animation
   useEffect(() => {
@@ -71,19 +83,20 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
   }, []);
 
   const onDismiss = useCallback(async () => {
+    await stopAlarmSound();
     if (alarmId) {
       await handleDismiss(alarmId);
-    } else {
-      await stopAlarmSound();
     }
+    // Exit the standalone activity
+    setTimeout(() => BackHandler.exitApp(), 300);
   }, [alarmId]);
 
   const onSnooze = useCallback(async () => {
+    await stopAlarmSound();
     if (alarmId) {
       await handleSnooze(alarmId);
-    } else {
-      await stopAlarmSound();
     }
+    setTimeout(() => BackHandler.exitApp(), 300);
   }, [alarmId]);
 
   // Swipe up to dismiss
@@ -163,7 +176,7 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
             <Text
               style={{ color: COLORS.textMuted, fontSize: 28, marginBottom: 4 }}
             >
-              {'▲'}
+              {'\u25B2'}
             </Text>
             <Text style={{ color: COLORS.textMuted, fontSize: 15 }}>
               Swipe up to dismiss
@@ -203,7 +216,7 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
                   fontWeight: '600',
                 }}
               >
-                Snooze · {snoozeMins} min
+                Snooze \u00B7 {snoozeMins} min
               </Text>
             </Pressable>
           </View>
@@ -213,7 +226,7 @@ function AlarmScreenComponent({ notification }: { notification: any }) {
   );
 }
 
-// Register as a standalone component for Notifee's fullScreenAction
+// Register as a standalone component for native AlarmActivity
 AppRegistry.registerComponent('alarm-screen', () => AlarmScreenComponent);
 
 export default AlarmScreenComponent;

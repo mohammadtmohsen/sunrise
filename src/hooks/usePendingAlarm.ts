@@ -1,15 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import notifee from '@notifee/react-native';
 import type { Router } from 'expo-router';
 import { useAlarmStore } from '../stores/alarmStore';
 import { mmkv } from '../stores/storage';
 import { handleDismiss } from '../services/alarmEventHandler';
 
 /**
- * Detects pending alarms from MMKV / initial notification and navigates
- * to the alarm trigger screen. Handles cold start, warm start, and
- * alarm firing while the app is open.
+ * Detects pending alarms from MMKV and navigates to the alarm trigger screen.
+ * Handles cold start, warm start, and alarm firing while the app is open.
  *
  * Returns { isReady } — false until the initial pending-alarm check completes,
  * so the home screen doesn't flash before the alarm trigger screen.
@@ -48,24 +46,13 @@ export function usePendingAlarm(router: Router) {
 
     // Check on mount (cold start) — run immediately, no delay
     async function checkInitialNotification() {
-      // Synchronous MMKV check first (instant)
+      // Synchronous MMKV check (instant)
       if (checkPendingAlarm()) {
         setIsReady(true);
         return;
       }
 
-      // Then check Notifee's initial notification (async, for tapped-to-open case)
-      const initial = await notifee.getInitialNotification();
-      if (initial) {
-        const alarmId = initial.notification?.data?.alarmId as string | undefined;
-        const isAlarm = initial.notification?.data?.type === 'alarm-trigger';
-        if (alarmId && isAlarm) {
-          const alarm = useAlarmStore.getState().alarms[alarmId];
-          if (alarm?.alarmStyle !== 'reminder') {
-            router.replace({ pathname: '/alarm-trigger', params: { alarmId } });
-          }
-        }
-      }
+      // No Notifee initial notification check needed — MMKV is the sole source of truth
       setIsReady(true);
     }
 
@@ -82,7 +69,7 @@ export function usePendingAlarm(router: Router) {
       },
     );
 
-    // Listen for MMKV changes — catches the case where foreground service
+    // Listen for MMKV changes — catches the case where native alarm service
     // stores alarm ID while the app is already open (replaces 1s polling)
     const mmkvListener = mmkv.addOnValueChangedListener((key) => {
       if (key === 'pending-alarm-id') {
