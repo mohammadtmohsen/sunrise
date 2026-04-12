@@ -10,6 +10,7 @@ import {
   computeNextRelativeTriggerForDays,
 } from '../utils/timeUtils';
 import { DEFAULT_SNOOZE_MINUTES } from '../utils/constants';
+import { syncAlarmsToWatch } from '../services/wearDataLayer';
 
 interface AddAlarmParams {
   name: string;
@@ -165,3 +166,8 @@ export const useAlarmStore = create<AlarmState>()(
     },
   ),
 );
+
+// Sync alarm state to the connected Wear OS watch whenever alarms change
+useAlarmStore.subscribe((state) => {
+  syncAlarmsToWatch(state.alarms);
+});

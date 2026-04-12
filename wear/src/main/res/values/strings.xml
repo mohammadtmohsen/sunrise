@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lumora</string>
+    <string name="tile_label">Next Alarm</string>
+    <string name="no_alarms">No alarms</string>
+    <string name="add_alarm">Add alarm</string>
+    <string name="edit_alarm">Edit alarm</string>
+    <string name="delete_alarm">Delete alarm</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="enabled">Enabled</string>
+    <string name="disabled">Disabled</string>
+    <string name="alarm">Alarm</string>
+    <string name="reminder">Reminder</string>
+    <string name="fixed_time">Fixed Time</string>
+    <string name="relative_time">Sunrise/Sunset</string>
+</resources>

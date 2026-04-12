@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { View, Text, FlatList, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useLocation } from '../../src/hooks/useLocation';
@@ -11,6 +11,7 @@ import { SunTimesDisplay } from '../../src/components/SunTimesDisplay';
 import { PermissionBanner } from '../../src/components/PermissionBanner';
 import { BatteryOptimizationPrompt } from '../../src/components/BatteryOptimizationPrompt';
 import { COLORS } from '../../src/utils/constants';
+import { updateWatchSunTimes } from '../../src/services/wearDataLayer';
 import type { Alarm } from '../../src/models/types';
 
 export default function HomeScreen() {
@@ -18,6 +19,11 @@ export default function HomeScreen() {
   const { location, isLoading: locationLoading, fetchLocation } = useLocation();
   const { todaySunTimes, isValid } = useSunTimes(location);
   const { alarms, toggleAlarm } = useAlarms(todaySunTimes);
+
+  // Push sun times to the watch whenever they change
+  useEffect(() => {
+    updateWatchSunTimes(todaySunTimes);
+  }, [todaySunTimes]);
 
   const handleAlarmPress = useCallback(
     (id: string) => {

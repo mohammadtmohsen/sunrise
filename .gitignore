@@ -43,3 +43,10 @@ yarn-error.*
 # EAS local builds
 build-*.apk
 build-*.aab
+
+# Wear OS app build artifacts
+wear/.gradle/
+wear/.kotlin/
+wear/.idea/
+wear/build/
+wear/local.properties
